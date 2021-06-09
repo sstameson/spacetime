@@ -3,7 +3,7 @@
 
 #include "vector.h"
 
-void translate_poly(Vector2 *poly, size_t n, Vector2 t);
+void poly_translate(Vector2 *poly, size_t n, Vector2 t);
 
 Vector2 poly_min(Vector2 *poly, size_t n);
 

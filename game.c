@@ -80,8 +80,7 @@ void spawn_asteroid(GameState *state, double r)
             .x = rand_double(MIN.x, MAX.x),
             .y = rand_double(MIN.x, MAX.x),
         };
-        translate_poly(
-            state->es[state->n].points, state->es[state->n].n_points, cent);
+        poly_translate(state->es[state->n].points, state->es[state->n].n_points, cent);
         state->es[state->n].cent = cent;
     }
 
@@ -115,21 +114,21 @@ void update(GameState *state, double dt)
             Vector2 min = poly_min(state->es[i].points, state->es[i].n_points);
             Vector2 max = poly_max(state->es[i].points, state->es[i].n_points);
             if (max.x < MIN.x && state->es[i].v.x < 0.0) {
-                translate_poly(state->es[i].points, state->es[i].n_points,
+                poly_translate(state->es[i].points, state->es[i].n_points,
                                vec((MAX.x - MIN.x) + (max.x - min.x), 0.0));
             } else if (max.y < MIN.y && state->es[i].v.y < 0.0) {
-                translate_poly(state->es[i].points, state->es[i].n_points,
+                poly_translate(state->es[i].points, state->es[i].n_points,
                                vec(0.0, (MAX.y - MIN.y) + (max.y - min.y)));
             } else if (min.x > MAX.x && state->es[i].v.x > 0.0) {
-                translate_poly(state->es[i].points, state->es[i].n_points,
+                poly_translate(state->es[i].points, state->es[i].n_points,
                                vec(-(MAX.x - MIN.x) - (max.x - min.x), 0.0));
             } else if (min.y > MAX.y && state->es[i].v.y > 0.0) {
-                translate_poly(state->es[i].points, state->es[i].n_points,
+                poly_translate(state->es[i].points, state->es[i].n_points,
                                vec(0.0, -(MAX.y - MIN.y) - (max.y - min.y)));
             }
         }
 
-        translate_poly(state->es[i].points, state->es[i].n_points, vec_mul(dt, state->es[i].v));
+        poly_translate(state->es[i].points, state->es[i].n_points, vec_mul(dt, state->es[i].v));
     }
 }
 
@@ -145,9 +144,9 @@ void render(GameState *state)
 
 int main(void)
 {
+    sdl_init();
     static GameState state;
     init(&state);
-    sdl_init();
 
     while (sdl_running()) {
         update(&state, time_since_last_tick());
