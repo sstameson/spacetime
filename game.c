@@ -77,20 +77,16 @@ void free_entity(Entity entities[MAX_ENTITIES], EntityIndex idx)
     entities[idx].removed = true;
 }
 
-void entity_translate(GameState *state, EntityIndex idx, Vector2 t)
+void entity_translate(Entity *entity, Vector2 t)
 {
-    poly_translate(state->entities[idx].points, state->entities[idx].n_points, t);
-    state->entities[idx].cent = vec_add(state->entities[idx].cent, t);
+    poly_translate(entity->points, entity->n_points, t);
+    entity->cent = vec_add(entity->cent, t);
 }
 
-void entity_rotate(GameState *state, EntityIndex idx, double theta)
+void entity_rotate(Entity *entity, double theta)
 {
-    poly_rotate(
-        state->entities[idx].points,
-        state->entities[idx].n_points,
-        theta,
-        state->entities[idx].cent);
-    state->entities[idx].theta += theta;
+    poly_rotate(entity->points, entity->n_points, theta, entity->cent);
+    entity->theta += theta;
 }
 
 void spawn_asteroid_with_info(
@@ -123,7 +119,7 @@ void spawn_asteroid_with_info(
         state->entities[idx].points, state->entities[idx].n_points);
     {
         Vector2 t = vec_sub(cent, state->entities[idx].cent);
-        entity_translate(state, idx, t);
+        entity_translate(&state->entities[idx], t);
     }
     state->entities[idx].v = v;
     state->entities[idx].a = vec(0.0, 0.0);
@@ -174,49 +170,46 @@ void init(GameState *state)
     }
 }
 
-void teleport(GameState *state, EntityIndex idx)
+void teleport(Entity *entity)
 {
-    Vector2 min = poly_min(
-        state->entities[idx].points, state->entities[idx].n_points);
-    Vector2 max = poly_max(
-        state->entities[idx].points, state->entities[idx].n_points);
+    Vector2 min = poly_min(entity->points, entity->n_points);
+    Vector2 max = poly_max(entity->points, entity->n_points);
 
-    if (max.x < MIN.x && state->entities[idx].v.x < 0.0) {
+    if (max.x < MIN.x && entity->v.x < 0.0) {
 
         Vector2 t = vec((MAX.x - MIN.x) + (max.x - min.x), 0.0);
-        entity_translate(state, idx, t);
+        entity_translate(entity, t);
 
-    } else if (max.y < MIN.y && state->entities[idx].v.y < 0.0) {
+    } else if (max.y < MIN.y && entity->v.y < 0.0) {
 
         Vector2 t = vec(0.0, (MAX.y - MIN.y) + (max.y - min.y));
-        entity_translate(state, idx, t);
+        entity_translate(entity, t);
 
-    } else if (min.x > MAX.x && state->entities[idx].v.x > 0.0) {
+    } else if (min.x > MAX.x && entity->v.x > 0.0) {
 
         Vector2 t = vec(-(MAX.x - MIN.x) - (max.x - min.x), 0.0);
-        entity_translate(state, idx, t);
+        entity_translate(entity, t);
 
-    } else if (min.y > MAX.y && state->entities[idx].v.y > 0.0) {
+    } else if (min.y > MAX.y && entity->v.y > 0.0) {
 
         Vector2 t = vec(0.0, -(MAX.y - MIN.y) - (max.y - min.y));
-        entity_translate(state, idx, t);
+        entity_translate(entity, t);
     }
 }
 
-void tick(GameState *state, EntityIndex idx, double dt)
+void tick(Entity *entity, double dt)
 {
-    state->entities[idx].v = vec_add(
-            state->entities[idx].v, vec_mul(dt, state->entities[idx].a));
-    entity_translate(state, idx, vec_mul(dt, state->entities[idx].v));
-    entity_rotate(state, idx, dt * state->entities[idx].omega);
+    entity->v = vec_add(entity->v, vec_mul(dt, entity->a));
+    entity_translate(entity, vec_mul(dt, entity->v));
+    entity_rotate(entity, dt * entity->omega);
 }
 
 void update(GameState *state, double dt)
 {
     for (size_t i = 0; i < state->asteroids.length; i++) {
         EntityIndex idx = state->asteroids.idxs[i];
-        teleport(state, idx);
-        tick(state, idx, dt);
+        teleport(&state->entities[idx]);
+        tick(&state->entities[idx], dt);
     }
 }
 
