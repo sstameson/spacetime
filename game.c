@@ -226,15 +226,21 @@ void render(GameState *state)
     sdl_show();
 }
 
+void key_handler(char key, KeyEventType type, double held_time, GameState *state)
+{
+    // TODO
+}
+
 int main(void)
 {
     sdl_init();
+    sdl_on_key((KeyHandler) key_handler);
     static GameState state;
     init_game(&state);
     double t = 0.0;
     size_t frames = 0;
 
-    while (sdl_running()) {
+    while (sdl_running(&state)) {
         double dt = time_since_last_tick();
         t += dt;
         frames++;

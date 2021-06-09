@@ -1,9 +1,26 @@
 #ifndef _SDL_WRAPPER_H_
 #define _SDL_WRAPPER_H_
 
+typedef enum {
+    LEFT_ARROW = 1,
+    UP_ARROW = 2,
+    RIGHT_ARROW = 3,
+    DOWN_ARROW = 4,
+    ENTER = 5
+} ArrowKey;
+
+typedef enum {
+    KEY_PRESSED,
+    KEY_RELEASED
+} KeyEventType;
+
+typedef void (*KeyHandler)(char key, KeyEventType type, double held_time, void *aux);
+
 void sdl_init(void);
 
-bool sdl_running(void);
+void sdl_on_key(KeyHandler handler);
+
+bool sdl_running(void *aux);
 
 void sdl_clear(void);
 

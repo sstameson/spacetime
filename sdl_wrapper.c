@@ -16,9 +16,12 @@ const Vector2 origin = {
 };
 SDL_Window *window;
 SDL_Renderer *renderer;
+const double MS_PER_SEC = 1000.0;
 static int16_t x_points[MAX_POINTS];
 static int16_t y_points[MAX_POINTS];
 static uint64_t prev_tick = 0;
+static KeyHandler key_handler;
+static uint32_t key_start_timestamp;
 
 void sdl_init(void)
 {
@@ -37,7 +40,24 @@ void sdl_init(void)
     renderer = SDL_CreateRenderer(window, -1, 0);
 }
 
-bool sdl_running(void)
+void sdl_on_key(KeyHandler handler)
+{
+    key_handler = handler;
+}
+
+char get_keycode(SDL_Keycode key) {
+    switch (key) {
+        case SDLK_LEFT: return LEFT_ARROW;
+        case SDLK_UP: return UP_ARROW;
+        case SDLK_RIGHT: return RIGHT_ARROW;
+        case SDLK_DOWN: return DOWN_ARROW;
+        case SDLK_RETURN: return ENTER;
+        default:
+            return key == (SDL_Keycode) (char) key ? key : '\0';
+    }
+}
+
+bool sdl_running(void *aux)
 {
     SDL_Event event;
     while (SDL_PollEvent(&event)) {
@@ -50,7 +70,21 @@ bool sdl_running(void)
             case SDL_KEYUP:
             case SDL_KEYDOWN:
             {
-                // TODO
+                if (key_handler == NULL) break;
+
+                char key = get_keycode(event.key.keysym.sym);
+                if (key == '\0') break;
+
+                uint32_t timestamp = event.key.timestamp;
+                if (!event.key.repeat) {
+                    key_start_timestamp = timestamp;
+                }
+                KeyEventType type =
+                    event.type == SDL_KEYDOWN ? KEY_PRESSED : KEY_RELEASED;
+                double held_time = (timestamp - key_start_timestamp) / MS_PER_SEC;
+                key_handler(key, type, held_time, aux);
+                break;
+
             } break;
         }
     }
