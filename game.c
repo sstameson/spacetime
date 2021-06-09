@@ -10,6 +10,7 @@
 #include "polygon.h"
 #include "sdl_wrapper.h"
 
+const double ASTEROID_VEL = 250.0;
 const Vector2 MAX = {
     .x = WIDTH / 2.0,
     .y = HEIGHT / 2.0,
@@ -28,7 +29,6 @@ typedef struct {
     Vector2 points[MAX_POINTS];
     size_t n_points;
     Color color;
-    Vector2 cent;
     Vector2 v;
     Vector2 a;
     double theta;
@@ -40,7 +40,12 @@ typedef struct {
     size_t n;
 } GameState;
 
-void spawn_asteroid(GameState *state, double r)
+void spawn_asteroid_with_info(
+    GameState *state,
+    double r,
+    Color color,
+    Vector2 cent,
+    Vector2 v)
 {
     assert(state->n < MAX_ENTITIES);
     if (state->n >= MAX_ENTITIES) {
@@ -63,40 +68,44 @@ void spawn_asteroid(GameState *state, double r)
     }
 
     state->es[state->n].n_points = ASTEROID_POINTS;
-
-    {
-        const uint8_t x = rand() % (200 - 50) + 50;
-        Color c = {
-            .r = x,
-            .g = x,
-            .b = x,
-            .a = 255,
-        };
-        state->es[state->n].color = c;
-    }
-
-    {
-        Vector2 cent = {
-            .x = rand_double(MIN.x, MAX.x),
-            .y = rand_double(MIN.x, MAX.x),
-        };
-        poly_translate(state->es[state->n].points, state->es[state->n].n_points, cent);
-        state->es[state->n].cent = cent;
-    }
-
-    {
-        double x = rand_double(-1.0, 1.0);
-        Vector2 dir = {
-            .x = x,
-            .y = (rand() % 2 ? -1.0 : 1.0) * sqrt(1.0 - x * x),
-        };
-        state->es[state->n].v = vec_mul(500.0, dir);
-    }
-
+    poly_translate(state->es[state->n].points, state->es[state->n].n_points, cent);
+    state->es[state->n].color = color;
+    state->es[state->n].v = v;
     state->es[state->n].a = vec(0.0, 0.0);
     state->es[state->n].theta = 0.0;
     state->es[state->n].omega = 0.0;
     state->n += 1;
+}
+
+void spawn_asteroid(GameState *state, double r)
+{
+    const uint8_t i = rand() % (200 - 50) + 50;
+    Color c = {.r = i, .g = i, .b = i, .a = 255 };
+    double d = rand_double(-1.0, 1.0);
+    Vector2 dir = {
+        .x = d,
+        .y = (rand() % 2 ? -1.0 : 1.0) * sqrt(1.0 - d * d),
+    };
+    Vector2 cent;
+    switch(rand() % 4) {
+        case 0:
+        {
+            cent = vec(MIN.x - r, rand_double(MIN.y, MAX.y));
+        } break;
+        case 1:
+        {
+            cent = vec(MAX.x + r, rand_double(MIN.y, MAX.y));
+        } break;
+        case 2:
+        {
+            cent = vec(rand_double(MIN.x, MAX.x), MIN.y - r);
+        } break;
+        case 3:
+        {
+            cent = vec(rand_double(MIN.x, MAX.x), MAX.y + r);
+        } break;
+    }
+    spawn_asteroid_with_info(state, r, c, cent, vec_mul(ASTEROID_VEL, dir));
 }
 
 void init(GameState *state)
@@ -147,11 +156,17 @@ int main(void)
     sdl_init();
     static GameState state;
     init(&state);
+    double t = 0.0;
+    size_t frames = 0;
 
     while (sdl_running()) {
-        update(&state, time_since_last_tick());
+        double dt = time_since_last_tick();
+        t += dt;
+        frames++;
+        update(&state, dt);
         render(&state);
     }
 
+    printf("%f fps\n", (double) frames / t);
     sdl_quit();
 }
