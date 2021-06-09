@@ -67,13 +67,13 @@ EntityIndex alloc_entity(Entity entities[MAX_ENTITIES])
             return i;
         }
     }
+    // TODO: Make the entities array dynamic
     fprintf(stderr, "Failed to allocate entity! Exiting...\n");
     exit(1);
 }
 
 void free_entity(Entity entities[MAX_ENTITIES], EntityIndex idx)
 {
-    // TODO: What to do about invalid IDs in Index arrays?
     entities[idx].removed = true;
 }
 
@@ -159,7 +159,7 @@ void spawn_asteroid(GameState *state, double r)
     spawn_asteroid_with_info(state, r, c, cent, vec_mul(ASTEROID_VEL, dir));
 }
 
-void init(GameState *state)
+void init_game(GameState *state)
 {
     for (size_t i = 0; i < MAX_ENTITIES; i++) {
         free_entity(state->entities, i);
@@ -230,7 +230,7 @@ int main(void)
 {
     sdl_init();
     static GameState state;
-    init(&state);
+    init_game(&state);
     double t = 0.0;
     size_t frames = 0;
 

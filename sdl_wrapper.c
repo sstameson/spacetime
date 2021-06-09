@@ -1,9 +1,7 @@
-#include <stdio.h>
-#include <stdlib.h>
 #include <stdbool.h>
 #include <stdint.h>
-#include <time.h>
 #include <SDL2/SDL.h>
+#include <SDL2/SDL_timer.h>
 #include <SDL2/SDL2_gfxPrimitives.h>
 
 #include "const.h"
@@ -12,16 +10,15 @@
 #include "sdl_wrapper.h"
 
 const char *WINDOW_TITLE = "Game";
-
 const Vector2 origin = {
     .x = WIDTH / 2.0,
     .y = HEIGHT / 2.0,
 };
 SDL_Window *window;
 SDL_Renderer *renderer;
-clock_t last_clock;
 static int16_t x_points[MAX_POINTS];
 static int16_t y_points[MAX_POINTS];
+static uint64_t prev_tick = 0;
 
 void sdl_init(void)
 {
@@ -93,10 +90,10 @@ void sdl_quit(void)
 
 double time_since_last_tick(void)
 {
-    clock_t now = clock();
-    double difference = last_clock
-        ? (double) (now - last_clock) / CLOCKS_PER_SEC
-        : 0.0; // return 0 the first time this is called
-    last_clock = now;
-    return difference;
+    uint64_t curr_tick = SDL_GetPerformanceCounter();
+    double diff = prev_tick
+        ? (double) (curr_tick - prev_tick) / (double) SDL_GetPerformanceFrequency()
+        : 0.0;
+    prev_tick = curr_tick;
+    return diff;
 }
