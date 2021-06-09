@@ -20,8 +20,8 @@ const Vector2 origin = {
 SDL_Window *window;
 SDL_Renderer *renderer;
 clock_t last_clock;
-static int16_t x_points[MAX_POLY_POINTS];
-static int16_t y_points[MAX_POLY_POINTS];
+static int16_t x_points[MAX_POINTS];
+static int16_t y_points[MAX_POINTS];
 
 void sdl_init(void)
 {

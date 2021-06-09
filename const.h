@@ -5,9 +5,9 @@
 #define WIDTH 1024
 #define HEIGHT 768
 
-#define ASTEROID_N_SIDES 10
+#define ASTEROID_POINTS 10
 
-#define MAX_POLY_POINTS 10
-#define MAX_POLYS 1000
+#define MAX_POINTS 10
+#define MAX_ENTITIES 1000
 
 #endif
