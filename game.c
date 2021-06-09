@@ -4,99 +4,77 @@
 #include <stdbool.h>
 
 #include "vector.h"
-#include "polygon.h"
 #include "color.h"
+#include "const.h"
+#include "polygon.h"
+#include "sdl_wrapper.h"
 
-#define ASTEROID_N_SIDES 10
-
-const size_t MAX_POLYS = 1000;
+const Vector2 MAX = {
+    .x = WIDTH / 2.0,
+    .y = HEIGHT / 2.0,
+};
+const Vector2 MIN = {
+    .x = -WIDTH / 2.0,
+    .y = -HEIGHT / 2.0,
+};
 const Color BLACK = {
     .r = 0,
     .g = 0,
     .b = 0,
+    .a = 255,
 };
 
+double rand_double(double min, double max)
+{
+    return (max - min) * (double) rand() / (double) RAND_MAX + min;
+}
+
 typedef struct {
-    Vector2 **poly;
-    size_t *n_verts;
-    Vector2 *v;
-    Vector2 *a;
-    double *theta;
-    double *omega;
-    Color *color;
+    Vector2 poly[MAX_POLYS][MAX_POLY_POINTS];
+    size_t n_verts[MAX_POLYS];
+    Color color[MAX_POLYS];
+    Vector2 v[MAX_POLYS];
+    Vector2 a[MAX_POLYS];
+    double theta[MAX_POLYS];
+    double omega[MAX_POLYS];
     size_t n;
 } GameState;
 
-GameState *init_state(void) {
-    GameState *state = malloc(sizeof(GameState));
-    state->poly = malloc(MAX_POLYS * sizeof(Vector2 *));
-    state->n_verts = malloc(MAX_POLYS * sizeof(size_t));
-    state->v = malloc(MAX_POLYS * sizeof(Vector2));
-    state->a = malloc(MAX_POLYS * sizeof(Vector2));
-    state->theta = malloc(MAX_POLYS * sizeof(double));
-    state->omega = malloc(MAX_POLYS * sizeof(double));
-    state->color = malloc(MAX_POLYS * sizeof(Color));
-    state->n = 0;
-    return state;
-}
+void spawn_asteroid(GameState *state, double r) {
+    {
+        double theta = 0.0;
+        double steps[ASTEROID_N_SIDES];
+        double sum = 0.0;
 
-void free_state(GameState *state) {
-    for (size_t i = 0; i < state->n; i++) {
-        free(state->poly[i]);
-    }
-    free(state->poly);
-    free(state->n_verts);
-    free(state->v);
-    free(state->a);
-    free(state->theta);
-    free(state->omega);
-    free(state->color);
-    free(state);
-}
+        for (size_t i = 0; i < ASTEROID_N_SIDES; i++) {
+            steps[i] = rand_double(0.0, 1.0);
+            sum += steps[i];
+        }
 
-Vector2 *asteroid_poly(double r) {
-    double theta = 0.0;
-    double steps[ASTEROID_N_SIDES];
-    double sum = 0.0;
-
-    for (size_t i = 0; i < ASTEROID_N_SIDES; i++) {
-        steps[i] = (double) rand() / (double) RAND_MAX;
-        sum += steps[i];
+        Vector2 v = vec(0.0, r);
+        for (size_t i = 0; i < ASTEROID_N_SIDES; i++) {
+            state->poly[state->n][i] = vec_rotate(theta, v);
+            theta += 2.0 * M_PI * (steps[i] / sum);
+        }
     }
 
-    Vector2 v = vec(0.0, r);
-    Vector2 *asteroid = malloc(ASTEROID_N_SIDES * sizeof(Vector2));
+    state->n_verts[state->n] = ASTEROID_N_SIDES;
 
-    for (size_t i = 0; i < ASTEROID_N_SIDES; i++) {
-        asteroid[i] = vec_rotate(theta, v);
-        theta += 2.0 * M_PI * (steps[i] / sum);
-    }
+    Vector2 cent = {
+        .x = rand_double(MIN.x, MAX.x),
+        .y = rand_double(MIN.x, MAX.x),
+    };
+    translate_poly(state->poly[state->n], state->n_verts[state->n], cent);
 
-    return asteroid;
-}
+    const uint8_t x = rand() % (200 - 50) + 50;
+    Color c = {
+        .r = x,
+        .g = x,
+        .b = x,
+        .a = 255,
+    };
+    state->color[state->n] = c;
 
-void spawn_poly(
-    GameState *state,
-    Vector2 *poly,
-    size_t n_verts,
-    Vector2 v,
-    Vector2 a,
-    double theta,
-    double omega,
-    Color color)
-{
-    if (state->n >= MAX_POLYS) {
-        fprintf(stderr, "Out of memory! Exiting...\n");
-        free_state(state);
-        exit(1);
-    }
-    state->poly[state->n] = poly;
-    state->n_verts[state->n] = n_verts;
-    state->v[state->n] = v;
-    state->a[state->n] = a;
-    state->theta[state->n] = theta;
-    state->omega[state->n] = omega;
-    state->color[state->n] = color;
     state->n += 1;
 }
 
@@ -105,24 +83,27 @@ void update(GameState *state, double dt) {
         Vector2 prev_v = state->v[i];
         state->v[i] = vec_add(state->v[i], vec_mul(dt, state->a[i]));
         Vector2 v = vec_mul(0.5, vec_add(prev_v, state->v[i]));
+
         translate_poly(state->poly[i], state->n_verts[i], vec_mul(dt, v));
     }
 }
 
-void render(GameState *state) {
-    /* TODO */
-}
-
 int main(void)
 {
-    GameState *state = init_state();
-    spawn_poly(
-        state, asteroid_poly(25.0), ASTEROID_N_SIDES,
-        vec(0.0, 0.0), vec(0.0, 0.0), 0.0, 0.0, BLACK);
+    static GameState state;
 
-    for (size_t i = 0; i < 100000; i++) {
-        update(state, 1e-3);
+    sdl_init();
+
+    for (size_t i = 0; i < 10; ++i)
+        spawn_asteroid(&state, 100.0);
+
+    while (sdl_running()) {
+        sdl_clear();
+        for (size_t i = 0; i < state.n; i++) {
+            sdl_draw_polygon(state.poly[i], state.n_verts[i], state.color[i]);
+        }
+        sdl_show();
     }
 
-    free_state(state);
+    sdl_quit();
 }
