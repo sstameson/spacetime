@@ -29,16 +29,47 @@ typedef struct {
     Vector2 points[MAX_POINTS];
     size_t n_points;
     Color color;
+    Vector2 cent;
     Vector2 v;
     Vector2 a;
     double theta;
     double omega;
 } Entity;
 
+typedef size_t EntityIndex;
+
+typedef struct {
+    EntityIndex idxs[MAX_ENTITIES];
+    size_t n;
+} EntityIndexArray;
+
 typedef struct {
     Entity es[MAX_ENTITIES];
     size_t n;
 } GameState;
+
+EntityIndex alloc_entity(GameState *state) {
+    // TODO: This should return the first free entity
+    // Idea: Use a "removed" flag on entities
+    return 0;
+}
+
+void free_entity(GameState *state, EntityIndex idx) {
+    // TODO: This should free the given entity
+    // Idea: set the removed flag to true
+}
+
+void entity_translate(GameState *state, EntityIndex idx, Vector2 t)
+{
+    poly_translate(state->es[idx].points, state->es[idx].n_points, t);
+    state->es[idx].cent = vec_add(state->es[idx].cent, t);
+}
+
+void entity_rotate(GameState *state, EntityIndex idx, double theta)
+{
+    poly_rotate(state->es[idx].points, state->es[idx].n_points, theta, state->es[idx].cent);
+    state->es[idx].theta += theta;
+}
 
 void spawn_asteroid_with_info(
     GameState *state,
@@ -68,12 +99,17 @@ void spawn_asteroid_with_info(
     }
 
     state->es[state->n].n_points = ASTEROID_POINTS;
-    poly_translate(state->es[state->n].points, state->es[state->n].n_points, cent);
     state->es[state->n].color = color;
+    state->es[state->n].cent = poly_centroid(
+        state->es[state->n].points, state->es[state->n].n_points);
+    {
+        Vector2 t = vec_sub(cent, state->es[state->n].cent);
+        entity_translate(state, state->n, t);
+    }
     state->es[state->n].v = v;
     state->es[state->n].a = vec(0.0, 0.0);
     state->es[state->n].theta = 0.0;
-    state->es[state->n].omega = 0.0;
+    state->es[state->n].omega = 1.0;
     state->n += 1;
 }
 
@@ -123,21 +159,23 @@ void update(GameState *state, double dt)
             Vector2 min = poly_min(state->es[i].points, state->es[i].n_points);
             Vector2 max = poly_max(state->es[i].points, state->es[i].n_points);
             if (max.x < MIN.x && state->es[i].v.x < 0.0) {
-                poly_translate(state->es[i].points, state->es[i].n_points,
-                               vec((MAX.x - MIN.x) + (max.x - min.x), 0.0));
+                Vector2 t = vec((MAX.x - MIN.x) + (max.x - min.x), 0.0);
+                entity_translate(state, i, t);
             } else if (max.y < MIN.y && state->es[i].v.y < 0.0) {
-                poly_translate(state->es[i].points, state->es[i].n_points,
-                               vec(0.0, (MAX.y - MIN.y) + (max.y - min.y)));
+                Vector2 t = vec(0.0, (MAX.y - MIN.y) + (max.y - min.y));
+                entity_translate(state, i, t);
             } else if (min.x > MAX.x && state->es[i].v.x > 0.0) {
-                poly_translate(state->es[i].points, state->es[i].n_points,
-                               vec(-(MAX.x - MIN.x) - (max.x - min.x), 0.0));
+                Vector2 t = vec(-(MAX.x - MIN.x) - (max.x - min.x), 0.0);
+                entity_translate(state, i, t);
             } else if (min.y > MAX.y && state->es[i].v.y > 0.0) {
-                poly_translate(state->es[i].points, state->es[i].n_points,
-                               vec(0.0, -(MAX.y - MIN.y) - (max.y - min.y)));
+                Vector2 t = vec(0.0, -(MAX.y - MIN.y) - (max.y - min.y));
+                entity_translate(state, i, t);
             }
         }
 
-        poly_translate(state->es[i].points, state->es[i].n_points, vec_mul(dt, state->es[i].v));
+        state->es[i].v = vec_add(state->es[i].v, vec_mul(dt, state->es[i].a));
+        entity_translate(state, i, vec_mul(dt, state->es[i].v));
+        entity_rotate(state, i, dt * state->es[i].omega);
     }
 }
 
