@@ -34,41 +34,63 @@ typedef struct {
     Vector2 a;
     double theta;
     double omega;
+    bool removed;
 } Entity;
 
 typedef size_t EntityIndex;
 
 typedef struct {
     EntityIndex idxs[MAX_ENTITIES];
-    size_t n;
+    size_t length;
 } EntityIndexArray;
 
 typedef struct {
-    Entity es[MAX_ENTITIES];
-    size_t n;
+    Entity entities[MAX_ENTITIES];
+    EntityIndex player;
+    EntityIndexArray asteroids;
+    EntityIndexArray bullets;
+    EntityIndexArray particles;
 } GameState;
 
-EntityIndex alloc_entity(GameState *state) {
-    // TODO: This should return the first free entity
-    // Idea: Use a "removed" flag on entities
-    return 0;
+void push(EntityIndexArray *arr, EntityIndex idx)
+{
+    assert(arr->length < MAX_ENTITIES);
+    arr->idxs[arr->length] = idx;
+    arr->length += 1;
 }
 
-void free_entity(GameState *state, EntityIndex idx) {
-    // TODO: This should free the given entity
-    // Idea: set the removed flag to true
+EntityIndex alloc_entity(Entity entities[MAX_ENTITIES])
+{
+    for (size_t i = 0; i < MAX_ENTITIES; i++) {
+        if (entities[i].removed) {
+            entities[i].removed = false;
+            return i;
+        }
+    }
+    fprintf(stderr, "Failed to allocate entity! Exiting...\n");
+    exit(1);
+}
+
+void free_entity(Entity entities[MAX_ENTITIES], EntityIndex idx)
+{
+    // TODO: What to do about invalid IDs in Index arrays?
+    entities[idx].removed = true;
 }
 
 void entity_translate(GameState *state, EntityIndex idx, Vector2 t)
 {
-    poly_translate(state->es[idx].points, state->es[idx].n_points, t);
-    state->es[idx].cent = vec_add(state->es[idx].cent, t);
+    poly_translate(state->entities[idx].points, state->entities[idx].n_points, t);
+    state->entities[idx].cent = vec_add(state->entities[idx].cent, t);
 }
 
 void entity_rotate(GameState *state, EntityIndex idx, double theta)
 {
-    poly_rotate(state->es[idx].points, state->es[idx].n_points, theta, state->es[idx].cent);
-    state->es[idx].theta += theta;
+    poly_rotate(
+        state->entities[idx].points,
+        state->entities[idx].n_points,
+        theta,
+        state->entities[idx].cent);
+    state->entities[idx].theta += theta;
 }
 
 void spawn_asteroid_with_info(
@@ -78,10 +100,7 @@ void spawn_asteroid_with_info(
     Vector2 cent,
     Vector2 v)
 {
-    assert(state->n < MAX_ENTITIES);
-    if (state->n >= MAX_ENTITIES) {
-        return;
-    }
+    EntityIndex idx = alloc_entity(state->entities);
 
     {
         double theta = 0.0;
@@ -93,24 +112,24 @@ void spawn_asteroid_with_info(
         }
         Vector2 v = vec(0.0, r);
         for (size_t i = 0; i < ASTEROID_POINTS; i++) {
-            state->es[state->n].points[i] = vec_rotate(theta, v);
+            state->entities[idx].points[i] = vec_rotate(theta, v);
             theta += 2.0 * M_PI * (steps[i] / sum);
         }
     }
 
-    state->es[state->n].n_points = ASTEROID_POINTS;
-    state->es[state->n].color = color;
-    state->es[state->n].cent = poly_centroid(
-        state->es[state->n].points, state->es[state->n].n_points);
+    state->entities[idx].n_points = ASTEROID_POINTS;
+    state->entities[idx].color = color;
+    state->entities[idx].cent = poly_centroid(
+        state->entities[idx].points, state->entities[idx].n_points);
     {
-        Vector2 t = vec_sub(cent, state->es[state->n].cent);
-        entity_translate(state, state->n, t);
+        Vector2 t = vec_sub(cent, state->entities[idx].cent);
+        entity_translate(state, idx, t);
     }
-    state->es[state->n].v = v;
-    state->es[state->n].a = vec(0.0, 0.0);
-    state->es[state->n].theta = 0.0;
-    state->es[state->n].omega = 1.0;
-    state->n += 1;
+    state->entities[idx].v = v;
+    state->entities[idx].a = vec(0.0, 0.0);
+    state->entities[idx].theta = 0.0;
+    state->entities[idx].omega = 1.0;
+    push(&state->asteroids, idx);
 }
 
 void spawn_asteroid(GameState *state, double r)
@@ -146,45 +165,70 @@ void spawn_asteroid(GameState *state, double r)
 
 void init(GameState *state)
 {
-    state->n = 0;
+    for (size_t i = 0; i < MAX_ENTITIES; i++) {
+        free_entity(state->entities, i);
+    }
+
     for (size_t i = 0; i < 5; i++) {
         spawn_asteroid(state, 100.0);
     }
 }
 
+void teleport(GameState *state, EntityIndex idx)
+{
+    Vector2 min = poly_min(
+        state->entities[idx].points, state->entities[idx].n_points);
+    Vector2 max = poly_max(
+        state->entities[idx].points, state->entities[idx].n_points);
+
+    if (max.x < MIN.x && state->entities[idx].v.x < 0.0) {
+
+        Vector2 t = vec((MAX.x - MIN.x) + (max.x - min.x), 0.0);
+        entity_translate(state, idx, t);
+
+    } else if (max.y < MIN.y && state->entities[idx].v.y < 0.0) {
+
+        Vector2 t = vec(0.0, (MAX.y - MIN.y) + (max.y - min.y));
+        entity_translate(state, idx, t);
+
+    } else if (min.x > MAX.x && state->entities[idx].v.x > 0.0) {
+
+        Vector2 t = vec(-(MAX.x - MIN.x) - (max.x - min.x), 0.0);
+        entity_translate(state, idx, t);
+
+    } else if (min.y > MAX.y && state->entities[idx].v.y > 0.0) {
+
+        Vector2 t = vec(0.0, -(MAX.y - MIN.y) - (max.y - min.y));
+        entity_translate(state, idx, t);
+    }
+}
+
+void tick(GameState *state, EntityIndex idx, double dt)
+{
+    state->entities[idx].v = vec_add(
+            state->entities[idx].v, vec_mul(dt, state->entities[idx].a));
+    entity_translate(state, idx, vec_mul(dt, state->entities[idx].v));
+    entity_rotate(state, idx, dt * state->entities[idx].omega);
+}
+
 void update(GameState *state, double dt)
 {
-    for (size_t i = 0; i < state->n; i++) {
-        {
-            Vector2 min = poly_min(state->es[i].points, state->es[i].n_points);
-            Vector2 max = poly_max(state->es[i].points, state->es[i].n_points);
-            if (max.x < MIN.x && state->es[i].v.x < 0.0) {
-                Vector2 t = vec((MAX.x - MIN.x) + (max.x - min.x), 0.0);
-                entity_translate(state, i, t);
-            } else if (max.y < MIN.y && state->es[i].v.y < 0.0) {
-                Vector2 t = vec(0.0, (MAX.y - MIN.y) + (max.y - min.y));
-                entity_translate(state, i, t);
-            } else if (min.x > MAX.x && state->es[i].v.x > 0.0) {
-                Vector2 t = vec(-(MAX.x - MIN.x) - (max.x - min.x), 0.0);
-                entity_translate(state, i, t);
-            } else if (min.y > MAX.y && state->es[i].v.y > 0.0) {
-                Vector2 t = vec(0.0, -(MAX.y - MIN.y) - (max.y - min.y));
-                entity_translate(state, i, t);
-            }
-        }
-
-        state->es[i].v = vec_add(state->es[i].v, vec_mul(dt, state->es[i].a));
-        entity_translate(state, i, vec_mul(dt, state->es[i].v));
-        entity_rotate(state, i, dt * state->es[i].omega);
+    for (size_t i = 0; i < state->asteroids.length; i++) {
+        EntityIndex idx = state->asteroids.idxs[i];
+        teleport(state, idx);
+        tick(state, idx, dt);
     }
 }
 
 void render(GameState *state)
 {
     sdl_clear();
-    for (size_t i = 0; i < state->n; i++) {
+    for (size_t i = 0; i < state->asteroids.length; i++) {
+        EntityIndex idx = state->asteroids.idxs[i];
         sdl_draw_polygon(
-            state->es[i].points, state->es[i].n_points, state->es[i].color);
+            state->entities[idx].points,
+            state->entities[idx].n_points,
+            state->entities[idx].color);
     }
     sdl_show();
 }
