@@ -13,4 +13,6 @@ void sdl_show(void);
 
 void sdl_quit(void);
 
+double time_since_last_tick(void);
+
 #endif

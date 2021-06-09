@@ -17,12 +17,6 @@ const Vector2 MIN = {
     .x = -WIDTH / 2.0,
     .y = -HEIGHT / 2.0,
 };
-const Color BLACK = {
-    .r = 0,
-    .g = 0,
-    .b = 0,
-    .a = 255,
-};
 
 double rand_double(double min, double max)
 {
@@ -45,12 +39,10 @@ void spawn_asteroid(GameState *state, double r) {
         double theta = 0.0;
         double steps[ASTEROID_N_SIDES];
         double sum = 0.0;
-
         for (size_t i = 0; i < ASTEROID_N_SIDES; i++) {
             steps[i] = rand_double(0.0, 1.0);
             sum += steps[i];
         }
-
         Vector2 v = vec(0.0, r);
         for (size_t i = 0; i < ASTEROID_N_SIDES; i++) {
             state->poly[state->n][i] = vec_rotate(theta, v);
@@ -60,21 +52,37 @@ void spawn_asteroid(GameState *state, double r) {
 
     state->n_verts[state->n] = ASTEROID_N_SIDES;
 
-    Vector2 cent = {
-        .x = rand_double(MIN.x, MAX.x),
-        .y = rand_double(MIN.x, MAX.x),
-    };
-    translate_poly(state->poly[state->n], state->n_verts[state->n], cent);
+    {
+        Vector2 cent = {
+            .x = rand_double(MIN.x, MAX.x),
+            .y = rand_double(MIN.x, MAX.x),
+        };
+        translate_poly(state->poly[state->n], state->n_verts[state->n], cent);
+    }
 
-    const uint8_t x = rand() % (200 - 50) + 50;
-    Color c = {
-        .r = x,
-        .g = x,
-        .b = x,
-        .a = 255,
-    };
-    state->color[state->n] = c;
+    {
+        const uint8_t x = rand() % (200 - 50) + 50;
+        Color c = {
+            .r = x,
+            .g = x,
+            .b = x,
+            .a = 255,
+        };
+        state->color[state->n] = c;
+    }
 
+    {
+        double x = rand_double(-1.0, 1.0);
+        Vector2 dir = {
+            .x = x,
+            .y = (rand() % 2 ? -1.0 : 1.0) * sqrt(1.0 - x * x),
+        };
+        state->v[state->n] = vec_mul(30.0, dir);
+    }
+
+    state->a[state->n] = vec(0.0, 0.0);
+    state->theta[state->n] = 0.0;
+    state->omega[state->n] = 0.0;
     state->n += 1;
 }
 
@@ -88,21 +96,27 @@ void update(GameState *state, double dt) {
     }
 }
 
+void render(GameState *state) {
+    sdl_clear();
+    for (size_t i = 0; i < state->n; i++) {
+        sdl_draw_polygon(state->poly[i], state->n_verts[i], state->color[i]);
+    }
+    sdl_show();
+}
+
 int main(void)
 {
     static GameState state;
 
     sdl_init();
 
-    for (size_t i = 0; i < 10; ++i)
+    for (size_t i = 0; i < 10; ++i) {
         spawn_asteroid(&state, 100.0);
+    }
 
     while (sdl_running()) {
-        sdl_clear();
-        for (size_t i = 0; i < state.n; i++) {
-            sdl_draw_polygon(state.poly[i], state.n_verts[i], state.color[i]);
-        }
-        sdl_show();
+        update(&state, time_since_last_tick());
+        render(&state);
     }
 
     sdl_quit();

@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <time.h>
 #include <SDL2/SDL.h>
 #include <SDL2/SDL2_gfxPrimitives.h>
 
@@ -18,6 +19,7 @@ const Vector2 origin = {
 };
 SDL_Window *window;
 SDL_Renderer *renderer;
+clock_t last_clock;
 static int16_t x_points[MAX_POLY_POINTS];
 static int16_t y_points[MAX_POLY_POINTS];
 
@@ -89,3 +91,12 @@ void sdl_quit(void)
     SDL_Quit();
 }
 
+double time_since_last_tick(void)
+{
+    clock_t now = clock();
+    double difference = last_clock
+        ? (double) (now - last_clock) / CLOCKS_PER_SEC
+        : 0.0; // return 0 the first time this is called
+    last_clock = now;
+    return difference;
+}
