@@ -11,19 +11,20 @@
 #include "polygon.h"
 #include "sdl_wrapper.h"
 
-const double PLAYER_LENGTH = 100.0;
-const double PLAYER_WIDTH = 50.0;
+const double PLAYER_LENGTH = 80.0;
+const double PLAYER_WIDTH = 40.0;
 const double PLAYER_PROP = 0.75;
 const size_t BULLET_POINTS = 10;
 const double BULLET_RAD = 5.0;
-const double BULLET_VEL = 300.0;
-const double ASTEROID_RAD = 50.0;
+const double BULLET_VEL = 500.0;
+const double BIG_ASTEROID_RAD = 50.0;
+const double ASTEROID_RAD = 25.0;
 const double ASTEROID_VEL = 250.0;
 const uint8_t MIN_GREY = 50;
 const uint8_t MAX_GREY = 200;
-const double THRUST = 500.0;
+const double THRUST = 750.0;
 const double DRAG = 1.0;
-const double PLAYER_OMEGA = M_PI;
+const double PLAYER_OMEGA = 1.25 * M_PI;
 const Vector2 MAX = {
     .x = WIDTH / 2.0,
     .y = HEIGHT / 2.0,
@@ -40,6 +41,16 @@ double rand_double(double min, double max)
     return (max - min) * (double) rand() / (double) RAND_MAX + min;
 }
 
+Vector2 rand_dir(void)
+{
+    double d = rand_double(-1.0, 1.0);
+    Vector2 dir = {
+        .x = d,
+        .y = (rand() % 2 ? -1.0 : 1.0) * sqrt(1.0 - d * d),
+    };
+    return dir;
+}
+
 typedef struct {
     Polygon poly;
     Color color;
@@ -48,7 +59,7 @@ typedef struct {
     Vector2 a;
     double theta;
     double omega;
-    bool removed;
+    uint8_t health;
 } Entity;
 
 typedef size_t EntityIndex;
@@ -76,6 +87,7 @@ typedef struct {
 
 typedef struct {
     Entity entities[MAX_ENTITIES];
+    bool free[MAX_ENTITIES];
     EntityIndex player;
     EntityIndexArray asteroids;
     EntityIndexArray bullets;
@@ -105,11 +117,11 @@ void clear(EntityIndexArray *arr)
     arr->length = 0;
 }
 
-EntityIndex alloc_entity(Entity entities[MAX_ENTITIES])
+EntityIndex alloc_entity(bool free[MAX_ENTITIES])
 {
     for (size_t i = 0; i < MAX_ENTITIES; i++) {
-        if (entities[i].removed) {
-            entities[i].removed = false;
+        if (free[i]) {
+            free[i] = false;
             return i;
         }
     }
@@ -118,9 +130,9 @@ EntityIndex alloc_entity(Entity entities[MAX_ENTITIES])
     exit(1);
 }
 
-void free_entity(Entity entities[MAX_ENTITIES], EntityIndex idx)
+void free_entity(bool free[MAX_ENTITIES], EntityIndex idx)
 {
-    entities[idx].removed = true;
+    free[idx] = true;
 }
 
 void entity_translate(Entity *entity, Vector2 t)
@@ -147,9 +159,10 @@ void spawn_asteroid_with_info(
     double r,
     Color color,
     Vector2 cent,
-    Vector2 v)
+    Vector2 v,
+    uint8_t health)
 {
-    EntityIndex idx = alloc_entity(state->entities);
+    EntityIndex idx = alloc_entity(state->free);
     Entity *entity = &state->entities[idx];
     {
         double theta = 0.0;
@@ -176,18 +189,23 @@ void spawn_asteroid_with_info(
     entity->a = vec(0.0, 0.0);
     entity->theta = 0.0;
     entity->omega = 0.0;
+    entity->health = health;
     push(&state->asteroids, idx);
 }
 
-void spawn_asteroid(GameState *state, double r)
+void spawn_asteroid(GameState *state)
 {
     const uint8_t i = rand() % (MAX_GREY - MIN_GREY) + MIN_GREY;
     Color c = {.r = i, .g = i, .b = i, .a = 255 };
-    double d = rand_double(-1.0, 1.0);
-    Vector2 dir = {
-        .x = d,
-        .y = (rand() % 2 ? -1.0 : 1.0) * sqrt(1.0 - d * d),
-    };
+    double r;
+    uint8_t health;
+    if (rand() % 2) {
+        r = BIG_ASTEROID_RAD;
+        health = 2;
+    } else {
+        r = ASTEROID_RAD;
+        health = 1;
+    }
     Vector2 cent;
     switch(rand() % 4) {
         case 0:
@@ -207,7 +225,8 @@ void spawn_asteroid(GameState *state, double r)
             cent = vec(rand_double(MIN.x, MAX.x), MAX.y + r);
         } break;
     }
-    spawn_asteroid_with_info(state, r, c, cent, vec_mul(ASTEROID_VEL, dir));
+    spawn_asteroid_with_info(
+            state, r, c, cent, vec_mul(ASTEROID_VEL, rand_dir()), health);
 }
 
 void teleport(Entity *entity)
@@ -241,7 +260,7 @@ void init_game(GameState *state)
 {
     // Free all existing entities
     for (size_t i = 0; i < MAX_ENTITIES; i++) {
-        free_entity(state->entities, i);
+        free_entity(state->free, i);
     }
     clear(&state->asteroids);
     clear(&state->bullets);
@@ -249,7 +268,7 @@ void init_game(GameState *state)
 
     // Spawn player
     {
-        state->player = alloc_entity(state->entities);
+        state->player = alloc_entity(state->free);
         Entity *player = &state->entities[state->player];
         player->poly.points[0] = vec(PLAYER_PROP * PLAYER_LENGTH, 0.0);
         player->poly.points[1] = vec(0.0, 0.5 * PLAYER_WIDTH);
@@ -263,11 +282,12 @@ void init_game(GameState *state)
         player->a = vec(0.0, 0.0);
         player->theta = 0.0;
         player->omega = 0.0;
+        player->health = 2;
     }
 
     // Spawn asteroids
     for (size_t i = 0; i < 5; i++) {
-        spawn_asteroid(state, ASTEROID_RAD);
+        spawn_asteroid(state);
     }
 
     // Initialize input state
@@ -311,7 +331,7 @@ void update(GameState *state, double dt)
             (min.x > MAX.x && bullet->v.x > 0.0) ||
             (min.y > MAX.y && bullet->v.y > 0.0))
         {
-            free_entity(state->entities, idx);
+            free_entity(state->free, idx);
             remove_index(&state->bullets, i);
             i--;
         }
@@ -342,7 +362,7 @@ void update(GameState *state, double dt)
 
         // Spawn bullets
         if (state->input.shooting) {
-            EntityIndex idx = alloc_entity(state->entities);
+            EntityIndex idx = alloc_entity(state->free);
             push(&state->bullets, idx);
             Entity *bullet = &state->entities[idx];
             double theta = 0.0;
@@ -375,10 +395,50 @@ void update(GameState *state, double dt)
 
                 if (find_collision(player_poly, asteroid_poly)) {
                     state->input.status = OVER;
-                    free_entity(state->entities, idx);
+                    free_entity(state->free, idx);
                     remove_index(&state->asteroids, i);
                     i--;
                 }
+            }
+        }
+    }
+
+    // Find bullet/asteroid collisions
+    for (size_t i = 0; i < state->asteroids.length; i++) {
+        for (size_t j = 0; j < state->bullets.length; j++) {
+            EntityIndex asteroid_idx = state->asteroids.idxs[i];
+            EntityIndex bullet_idx = state->bullets.idxs[j];
+            Entity *asteroid = &state->entities[asteroid_idx];
+            Polygon *asteroid_poly = &state->entities[asteroid_idx].poly;
+            Polygon *bullet_poly = &state->entities[bullet_idx].poly;
+
+            if (find_collision(asteroid_poly, bullet_poly)) {
+                asteroid->health -= 1;
+                if (asteroid->health == 0) {
+                    spawn_asteroid(state);
+                } else {
+                    spawn_asteroid_with_info(
+                        state,
+                        ASTEROID_RAD,
+                        asteroid->color,
+                        vec_add(asteroid->cent, vec(ASTEROID_RAD, 0.0)),
+                        vec_mul(ASTEROID_VEL, rand_dir()),
+                        1);
+                    spawn_asteroid_with_info(
+                        state,
+                        ASTEROID_RAD,
+                        asteroid->color,
+                        vec_sub(asteroid->cent, vec(ASTEROID_RAD, 0.0)),
+                        vec_mul(ASTEROID_VEL, rand_dir()),
+                        1);
+                }
+                free_entity(state->free, bullet_idx);
+                remove_index(&state->bullets, j);
+                j--;
+                free_entity(state->free, asteroid_idx);
+                remove_index(&state->asteroids, i);
+                i--;
+                break;
             }
         }
     }
@@ -494,7 +554,7 @@ int main(void)
         update(&state, dt);
         render(&state);
     }
-
     printf("%f fps\n", (double) frames / t);
+
     sdl_quit();
 }
