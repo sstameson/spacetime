@@ -33,8 +33,7 @@ double rand_double(double min, double max)
 }
 
 typedef struct {
-    Vector2 points[MAX_POINTS];
-    size_t n_points;
+    Polygon poly;
     Color color;
     Vector2 cent;
     Vector2 v;
@@ -99,13 +98,13 @@ void free_entity(Entity entities[MAX_ENTITIES], EntityIndex idx)
 
 void entity_translate(Entity *entity, Vector2 t)
 {
-    poly_translate(entity->points, entity->n_points, t);
+    poly_translate(&entity->poly, t);
     entity->cent = vec_add(entity->cent, t);
 }
 
 void entity_rotate(Entity *entity, double theta)
 {
-    poly_rotate(entity->points, entity->n_points, theta, entity->cent);
+    poly_rotate(&entity->poly, theta, entity->cent);
     entity->theta += theta;
 }
 
@@ -135,13 +134,13 @@ void spawn_asteroid_with_info(
         }
         Vector2 v = vec(0.0, r);
         for (size_t i = 0; i < ASTEROID_POINTS; i++) {
-            entity->points[i] = vec_rotate(theta, v);
+            entity->poly.points[i] = vec_rotate(theta, v);
             theta += 2.0 * M_PI * (steps[i] / sum);
         }
+        entity->poly.n = ASTEROID_POINTS;
     }
-    entity->n_points = ASTEROID_POINTS;
     entity->color = color;
-    entity->cent = poly_centroid(entity->points, entity->n_points);
+    entity->cent = poly_centroid(&entity->poly);
     {
         Vector2 t = vec_sub(cent, entity->cent);
         entity_translate(entity, t);
@@ -186,8 +185,8 @@ void spawn_asteroid(GameState *state, double r)
 
 void teleport(Entity *entity)
 {
-    Vector2 min = poly_min(entity->points, entity->n_points);
-    Vector2 max = poly_max(entity->points, entity->n_points);
+    Vector2 min = poly_min(&entity->poly);
+    Vector2 max = poly_max(&entity->poly);
 
     if (max.x < MIN.x && entity->v.x < 0.0) {
 
@@ -228,13 +227,13 @@ void init_game(GameState *state)
         const double PLAYER_PROP = 0.75;
         state->player = alloc_entity(state->entities);
         Entity *player = &state->entities[state->player];
-        player->points[0] = vec(PLAYER_PROP * PLAYER_LENGTH, 0.0);
-        player->points[1] = vec(0.0, 0.5 * PLAYER_WIDTH);
-        player->points[2] = vec(-(1 - PLAYER_PROP) * PLAYER_LENGTH, 0.0);
-        player->points[3] = vec(0.0, -0.5 * PLAYER_WIDTH);
-        player->n_points = 4;
+        player->poly.points[0] = vec(PLAYER_PROP * PLAYER_LENGTH, 0.0);
+        player->poly.points[1] = vec(0.0, 0.5 * PLAYER_WIDTH);
+        player->poly.points[2] = vec(-(1 - PLAYER_PROP) * PLAYER_LENGTH, 0.0);
+        player->poly.points[3] = vec(0.0, -0.5 * PLAYER_WIDTH);
+        player->poly.n = 4;
         player->color = BLACK;
-        player->cent = poly_centroid(player->points, player->n_points);
+        player->cent = poly_centroid(&player->poly);
         entity_translate(player, vec_mul(-1.0, player->cent));
         player->v = vec(0.0, 0.0);
         player->a = vec(0.0, 0.0);
@@ -296,13 +295,13 @@ void render(GameState *state)
     // Render asteroids
     for (size_t i = 0; i < state->asteroids.length; i++) {
         Entity *entity = &state->entities[state->asteroids.idxs[i]];
-        sdl_draw_polygon(entity->points, entity->n_points, entity->color);
+        sdl_draw_polygon(&entity->poly, entity->color);
     }
 
     // Render player
     {
         Entity *player = &state->entities[state->player];
-        sdl_draw_polygon(player->points, player->n_points, player->color);
+        sdl_draw_polygon(&player->poly, player->color);
     }
 
     sdl_show();

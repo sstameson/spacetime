@@ -6,6 +6,7 @@
 
 #include "const.h"
 #include "vector.h"
+#include "polygon.h"
 #include "color.h"
 #include "sdl_wrapper.h"
 
@@ -97,17 +98,17 @@ void sdl_clear(void)
     SDL_RenderClear(renderer);
 }
 
-void sdl_draw_polygon(Vector2 *poly, size_t n, Color c)
+void sdl_draw_polygon(Polygon *poly, Color c)
 {
-    for (size_t i = 0; i < n; i++) {
-        Vector2 v = poly[i];
+    for (size_t i = 0; i < poly->n; i++) {
+        Vector2 v = poly->points[i];
         v = vec_add(v, origin);
         v.y = -v.y + HEIGHT;
         x_points[i] = (int16_t) v.x;
         y_points[i] = (int16_t) v.y;
     }
 
-    filledPolygonRGBA(renderer, x_points, y_points, n, c.r, c.g, c.b, c.a);
+    filledPolygonRGBA(renderer, x_points, y_points, poly->n, c.r, c.g, c.b, c.a);
 }
 
 void sdl_show(void)

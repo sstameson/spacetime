@@ -2,17 +2,23 @@
 #define _POLYGON_H_
 
 #include "vector.h"
+#include "const.h"
 
-void poly_translate(Vector2 *poly, size_t n, Vector2 t);
+typedef struct {
+    Vector2 points[MAX_POINTS];
+    size_t n;
+} Polygon;
 
-void poly_rotate(Vector2 *poly, size_t n, double theta, Vector2 p);
+void poly_translate(Polygon *poly, Vector2 t);
 
-Vector2 poly_min(Vector2 *poly, size_t n);
+void poly_rotate(Polygon *poly, double theta, Vector2 v);
 
-Vector2 poly_max(Vector2 *poly, size_t n);
+Vector2 poly_min(Polygon *poly);
 
-double poly_area(Vector2 *poly, size_t n);
+Vector2 poly_max(Polygon *poly);
 
-Vector2 poly_centroid(Vector2 *poly, size_t n);
+double poly_area(Polygon *poly);
+
+Vector2 poly_centroid(Polygon *poly);
 
 #endif
