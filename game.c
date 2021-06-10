@@ -10,6 +10,7 @@
 #include "polygon.h"
 #include "sdl_wrapper.h"
 
+const double ASTEROID_RAD = 50.0;
 const double ASTEROID_VEL = 250.0;
 const double THRUST = 500.0;
 const double DRAG = 1.0;
@@ -71,6 +72,11 @@ void push(EntityIndexArray *arr, EntityIndex idx)
     arr->length += 1;
 }
 
+void clear(EntityIndexArray *arr)
+{
+    arr->length = 0;
+}
+
 EntityIndex alloc_entity(Entity entities[MAX_ENTITIES])
 {
     for (size_t i = 0; i < MAX_ENTITIES; i++) {
@@ -101,6 +107,13 @@ void entity_rotate(Entity *entity, double theta)
     entity->theta += theta;
 }
 
+void entity_tick(Entity *entity, double dt)
+{
+    entity->v = vec_add(entity->v, vec_mul(dt, entity->a));
+    entity_translate(entity, vec_mul(dt, entity->v));
+    entity_rotate(entity, dt * entity->omega);
+}
+
 void spawn_asteroid_with_info(
     GameState *state,
     double r,
@@ -109,7 +122,7 @@ void spawn_asteroid_with_info(
     Vector2 v)
 {
     EntityIndex idx = alloc_entity(state->entities);
-
+    Entity *entity = &state->entities[idx];
     {
         double theta = 0.0;
         double steps[ASTEROID_POINTS];
@@ -120,23 +133,21 @@ void spawn_asteroid_with_info(
         }
         Vector2 v = vec(0.0, r);
         for (size_t i = 0; i < ASTEROID_POINTS; i++) {
-            state->entities[idx].points[i] = vec_rotate(theta, v);
+            entity->points[i] = vec_rotate(theta, v);
             theta += 2.0 * M_PI * (steps[i] / sum);
         }
     }
-
-    state->entities[idx].n_points = ASTEROID_POINTS;
-    state->entities[idx].color = color;
-    state->entities[idx].cent = poly_centroid(
-        state->entities[idx].points, state->entities[idx].n_points);
+    entity->n_points = ASTEROID_POINTS;
+    entity->color = color;
+    entity->cent = poly_centroid(entity->points, entity->n_points);
     {
-        Vector2 t = vec_sub(cent, state->entities[idx].cent);
-        entity_translate(&state->entities[idx], t);
+        Vector2 t = vec_sub(cent, entity->cent);
+        entity_translate(entity, t);
     }
-    state->entities[idx].v = v;
-    state->entities[idx].a = vec(0.0, 0.0);
-    state->entities[idx].theta = 0.0;
-    state->entities[idx].omega = 0.0;
+    entity->v = v;
+    entity->a = vec(0.0, 0.0);
+    entity->theta = 0.0;
+    entity->omega = 0.0;
     push(&state->asteroids, idx);
 }
 
@@ -171,40 +182,6 @@ void spawn_asteroid(GameState *state, double r)
     spawn_asteroid_with_info(state, r, c, cent, vec_mul(ASTEROID_VEL, dir));
 }
 
-void init_game(GameState *state)
-{
-    for (size_t i = 0; i < MAX_ENTITIES; i++) {
-        free_entity(state->entities, i);
-    }
-
-    {
-        const double PLAYER_LENGTH = 100.0;
-        const double PLAYER_WIDTH = 50.0;
-        const double PROP = 0.75;
-        state->player = alloc_entity(state->entities);
-        state->entities[state->player].points[0] = vec(PROP * PLAYER_LENGTH, 0.0);
-        state->entities[state->player].points[1] = vec(0.0, 0.5 * PLAYER_WIDTH);
-        state->entities[state->player].points[2] = vec(-(1 - PROP) * PLAYER_LENGTH, 0.0);
-        state->entities[state->player].points[3] = vec(0.0, -0.5 * PLAYER_WIDTH);
-        state->entities[state->player].n_points = 4;
-        state->entities[state->player].color = BLACK;
-        state->entities[state->player].cent = poly_centroid(
-            state->entities[state->player].points,
-            state->entities[state->player].n_points);
-        entity_translate(
-            &state->entities[state->player],
-            vec_mul(-1.0, state->entities[state->player].cent));
-        state->entities[state->player].v = vec(0.0, 0.0);
-        state->entities[state->player].a = vec(0.0, 0.0);
-        state->entities[state->player].theta = 0.0;
-        state->entities[state->player].omega = 0.0;
-    }
-
-    for (size_t i = 0; i < 5; i++) {
-        spawn_asteroid(state, 100.0);
-    }
-}
-
 void teleport(Entity *entity)
 {
     Vector2 min = poly_min(entity->points, entity->n_points);
@@ -232,21 +209,63 @@ void teleport(Entity *entity)
     }
 }
 
-void tick(Entity *entity, double dt)
+void init_game(GameState *state)
 {
-    entity->v = vec_add(entity->v, vec_mul(dt, entity->a));
-    entity_translate(entity, vec_mul(dt, entity->v));
-    entity_rotate(entity, dt * entity->omega);
+    // Free all existing entities
+    for (size_t i = 0; i < MAX_ENTITIES; i++) {
+        free_entity(state->entities, i);
+    }
+    clear(&state->asteroids);
+    clear(&state->bullets);
+    clear(&state->particles);
+
+    // Spawn player
+    {
+        const double PLAYER_LENGTH = 100.0;
+        const double PLAYER_WIDTH = 50.0;
+        const double PLAYER_PROP = 0.75;
+        state->player = alloc_entity(state->entities);
+        Entity *player = &state->entities[state->player];
+        player->points[0] = vec(PLAYER_PROP * PLAYER_LENGTH, 0.0);
+        player->points[1] = vec(0.0, 0.5 * PLAYER_WIDTH);
+        player->points[2] = vec(-(1 - PLAYER_PROP) * PLAYER_LENGTH, 0.0);
+        player->points[3] = vec(0.0, -0.5 * PLAYER_WIDTH);
+        player->n_points = 4;
+        player->color = BLACK;
+        player->cent = poly_centroid(player->points, player->n_points);
+        entity_translate(player, vec_mul(-1.0, player->cent));
+        player->v = vec(0.0, 0.0);
+        player->a = vec(0.0, 0.0);
+        player->theta = 0.0;
+        player->omega = 0.0;
+    }
+
+    // Spawn asteroids
+    for (size_t i = 0; i < 5; i++) {
+        spawn_asteroid(state, ASTEROID_RAD);
+    }
+
+    // Initialize input state
+    {
+        state->input.thrusting = false;
+        state->input.turning_clockwise = false;
+        state->input.turning_counterclockwise = false;
+        state->input.shooting = false;
+    }
+
 }
+
 
 void update(GameState *state, double dt)
 {
+    // Update asteroids
     for (size_t i = 0; i < state->asteroids.length; i++) {
-        EntityIndex idx = state->asteroids.idxs[i];
-        teleport(&state->entities[idx]);
-        tick(&state->entities[idx], dt);
+        Entity *entity = &state->entities[state->asteroids.idxs[i]];
+        teleport(entity);
+        entity_tick(entity, dt);
     }
 
+    // Update player
     {
         Entity *player = &state->entities[state->player];
         player->a = vec_mul(-DRAG, player->v);
@@ -255,31 +274,35 @@ void update(GameState *state, double dt)
             Vector2 dir = vec(cos(player->theta), sin(player->theta));
             player->a = vec_add(player->a, vec_mul(THRUST, dir));
         }
-        if (state->input.turning_clockwise) {
+        if (state->input.turning_clockwise && state->input.turning_counterclockwise) {
+            player->omega = 0.0;
+        } else if (state->input.turning_clockwise) {
             player->omega = -PLAYER_OMEGA;
         } else if (state->input.turning_counterclockwise) {
             player->omega = PLAYER_OMEGA;
         } else {
             player->omega = 0.0;
         }
-        tick(player, dt);
+        entity_tick(player, dt);
     }
 }
 
 void render(GameState *state)
 {
     sdl_clear();
+
+    // Render asteroids
     for (size_t i = 0; i < state->asteroids.length; i++) {
-        EntityIndex idx = state->asteroids.idxs[i];
-        sdl_draw_polygon(
-            state->entities[idx].points,
-            state->entities[idx].n_points,
-            state->entities[idx].color);
+        Entity *entity = &state->entities[state->asteroids.idxs[i]];
+        sdl_draw_polygon(entity->points, entity->n_points, entity->color);
     }
-    sdl_draw_polygon(
-        state->entities[state->player].points,
-        state->entities[state->player].n_points,
-        state->entities[state->player].color);
+
+    // Render player
+    {
+        Entity *player = &state->entities[state->player];
+        sdl_draw_polygon(player->points, player->n_points, player->color);
+    }
+
     sdl_show();
 }
 
