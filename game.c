@@ -11,6 +11,9 @@
 #include "sdl_wrapper.h"
 
 const double ASTEROID_VEL = 250.0;
+const double THRUST = 500.0;
+const double DRAG = 1.0;
+const double PLAYER_OMEGA = M_PI;
 const Vector2 MAX = {
     .x = WIDTH / 2.0,
     .y = HEIGHT / 2.0,
@@ -19,6 +22,7 @@ const Vector2 MIN = {
     .x = -WIDTH / 2.0,
     .y = -HEIGHT / 2.0,
 };
+const Color BLACK = { .r = 0, .g = 0, .b = 0, .a = 255 };
 
 double rand_double(double min, double max)
 {
@@ -45,11 +49,19 @@ typedef struct {
 } EntityIndexArray;
 
 typedef struct {
+    bool thrusting;
+    bool turning_clockwise;
+    bool turning_counterclockwise;
+    bool shooting;
+} InputState;
+
+typedef struct {
     Entity entities[MAX_ENTITIES];
     EntityIndex player;
     EntityIndexArray asteroids;
     EntityIndexArray bullets;
     EntityIndexArray particles;
+    InputState input;
 } GameState;
 
 void push(EntityIndexArray *arr, EntityIndex idx)
@@ -124,7 +136,7 @@ void spawn_asteroid_with_info(
     state->entities[idx].v = v;
     state->entities[idx].a = vec(0.0, 0.0);
     state->entities[idx].theta = 0.0;
-    state->entities[idx].omega = 1.0;
+    state->entities[idx].omega = 0.0;
     push(&state->asteroids, idx);
 }
 
@@ -163,6 +175,29 @@ void init_game(GameState *state)
 {
     for (size_t i = 0; i < MAX_ENTITIES; i++) {
         free_entity(state->entities, i);
+    }
+
+    {
+        const double PLAYER_LENGTH = 100.0;
+        const double PLAYER_WIDTH = 50.0;
+        const double PROP = 0.75;
+        state->player = alloc_entity(state->entities);
+        state->entities[state->player].points[0] = vec(PROP * PLAYER_LENGTH, 0.0);
+        state->entities[state->player].points[1] = vec(0.0, 0.5 * PLAYER_WIDTH);
+        state->entities[state->player].points[2] = vec(-(1 - PROP) * PLAYER_LENGTH, 0.0);
+        state->entities[state->player].points[3] = vec(0.0, -0.5 * PLAYER_WIDTH);
+        state->entities[state->player].n_points = 4;
+        state->entities[state->player].color = BLACK;
+        state->entities[state->player].cent = poly_centroid(
+            state->entities[state->player].points,
+            state->entities[state->player].n_points);
+        entity_translate(
+            &state->entities[state->player],
+            vec_mul(-1.0, state->entities[state->player].cent));
+        state->entities[state->player].v = vec(0.0, 0.0);
+        state->entities[state->player].a = vec(0.0, 0.0);
+        state->entities[state->player].theta = 0.0;
+        state->entities[state->player].omega = 0.0;
     }
 
     for (size_t i = 0; i < 5; i++) {
@@ -211,6 +246,24 @@ void update(GameState *state, double dt)
         teleport(&state->entities[idx]);
         tick(&state->entities[idx], dt);
     }
+
+    {
+        Entity *player = &state->entities[state->player];
+        player->a = vec_mul(-DRAG, player->v);
+        teleport(player);
+        if (state->input.thrusting) {
+            Vector2 dir = vec(cos(player->theta), sin(player->theta));
+            player->a = vec_add(player->a, vec_mul(THRUST, dir));
+        }
+        if (state->input.turning_clockwise) {
+            player->omega = -PLAYER_OMEGA;
+        } else if (state->input.turning_counterclockwise) {
+            player->omega = PLAYER_OMEGA;
+        } else {
+            player->omega = 0.0;
+        }
+        tick(player, dt);
+    }
 }
 
 void render(GameState *state)
@@ -223,24 +276,69 @@ void render(GameState *state)
             state->entities[idx].n_points,
             state->entities[idx].color);
     }
+    sdl_draw_polygon(
+        state->entities[state->player].points,
+        state->entities[state->player].n_points,
+        state->entities[state->player].color);
     sdl_show();
 }
 
-void key_handler(char key, KeyEventType type, double held_time, GameState *state)
+void on_key(char key, KeyEventType type, double held_time, InputState *input)
 {
-    // TODO
+    switch(key) {
+        case UP_ARROW:
+        {
+            if (type == KEY_PRESSED) {
+                input->thrusting = true;
+            } else {
+                input->thrusting = false;
+            }
+        } break;
+
+        case LEFT_ARROW:
+        {
+            if (type == KEY_PRESSED) {
+                input->turning_counterclockwise = true;
+            } else {
+                input->turning_counterclockwise = false;
+            }
+        } break;
+
+        case RIGHT_ARROW:
+        {
+            if (type == KEY_PRESSED) {
+                input->turning_clockwise = true;
+            } else {
+                input->turning_clockwise = false;
+            }
+        } break;
+
+        case ' ':
+        {
+            if (type == KEY_PRESSED && held_time == 0.0) {
+                input->shooting = true;
+            }
+            else {
+                input->shooting = false;
+            }
+        } break;
+
+        default:
+        {
+        } break;
+    }
 }
 
 int main(void)
 {
     sdl_init();
-    sdl_on_key((KeyHandler) key_handler);
+    sdl_on_key((KeyHandler) on_key);
     static GameState state;
     init_game(&state);
     double t = 0.0;
     size_t frames = 0;
 
-    while (sdl_running(&state)) {
+    while (sdl_running(&state.input)) {
         double dt = time_since_last_tick();
         t += dt;
         frames++;
