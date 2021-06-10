@@ -11,6 +11,9 @@
 #include "polygon.h"
 #include "sdl_wrapper.h"
 
+const double PLAYER_LENGTH = 100.0;
+const double PLAYER_WIDTH = 50.0;
+const double PLAYER_PROP = 0.75;
 const size_t BULLET_POINTS = 10;
 const double BULLET_RAD = 5.0;
 const double BULLET_VEL = 300.0;
@@ -246,9 +249,6 @@ void init_game(GameState *state)
 
     // Spawn player
     {
-        const double PLAYER_LENGTH = 100.0;
-        const double PLAYER_WIDTH = 50.0;
-        const double PLAYER_PROP = 0.75;
         state->player = alloc_entity(state->entities);
         Entity *player = &state->entities[state->player];
         player->poly.points[0] = vec(PLAYER_PROP * PLAYER_LENGTH, 0.0);
@@ -298,10 +298,30 @@ void update(GameState *state, double dt)
         entity_tick(entity, dt);
     }
 
+    // Update bullets
+    for (size_t i = 0; i < state->bullets.length; i++) {
+        EntityIndex idx = state->bullets.idxs[i];
+        Entity *bullet = &state->entities[idx];
+        entity_tick(bullet, dt);
+
+        Vector2 min = poly_min(&bullet->poly);
+        Vector2 max = poly_max(&bullet->poly);
+        if ((max.x < MIN.x && bullet->v.x < 0.0) ||
+            (max.y < MIN.y && bullet->v.y < 0.0) ||
+            (min.x > MAX.x && bullet->v.x > 0.0) ||
+            (min.y > MAX.y && bullet->v.y > 0.0))
+        {
+            free_entity(state->entities, idx);
+            remove_index(&state->bullets, i);
+            i--;
+        }
+    }
+
     if (state->input.status == PLAYING) {
+        Entity *player = &state->entities[state->player];
+
         // Update player
         {
-            Entity *player = &state->entities[state->player];
             player->a = vec_mul(-DRAG, player->v);
             teleport(player);
             if (state->input.thrusting) {
@@ -335,10 +355,13 @@ void update(GameState *state, double dt)
             bullet->poly.n = BULLET_POINTS;
             bullet->color = RED;
             bullet->cent = poly_centroid(&bullet->poly);
-            bullet->v = vec(0.0, 0.0);
+            Vector2 dir = vec(cos(player->theta), sin(player->theta));
+            entity_translate(bullet, vec_add(player->cent, vec_mul(PLAYER_LENGTH / 2.0, dir)));
+            bullet->v = vec_mul(BULLET_VEL, dir);
             bullet->a = vec(0.0, 0.0);
             bullet->theta = 0.0;
             bullet->omega = 0.0;
+            state->input.shooting = false;
         }
 
         // Find player/asteroid collisions
@@ -428,8 +451,6 @@ void on_key(char key, KeyEventType type, double held_time, InputState *input)
                 {
                     if (type == KEY_PRESSED && held_time == 0.0) {
                         input->shooting = true;
-                    } else {
-                        input->shooting = false;
                     }
                 } break;
 
