@@ -12,6 +12,8 @@
 
 const double ASTEROID_RAD = 50.0;
 const double ASTEROID_VEL = 250.0;
+const uint8_t MIN_GREY = 50;
+const uint8_t MAX_GREY = 200;
 const double THRUST = 500.0;
 const double DRAG = 1.0;
 const double PLAYER_OMEGA = M_PI;
@@ -153,7 +155,7 @@ void spawn_asteroid_with_info(
 
 void spawn_asteroid(GameState *state, double r)
 {
-    const uint8_t i = rand() % (200 - 50) + 50;
+    const uint8_t i = rand() % (MAX_GREY - MIN_GREY) + MIN_GREY;
     Color c = {.r = i, .g = i, .b = i, .a = 255 };
     double d = rand_double(-1.0, 1.0);
     Vector2 dir = {
