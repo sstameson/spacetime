@@ -24,7 +24,7 @@ bool sdl_running(void *aux);
 
 void sdl_clear(void);
 
-void sdl_draw_polygon(Polygon *poly, Color c);
+void sdl_draw_polygon(const Polygon *poly, Color c);
 
 void sdl_show(void);
 

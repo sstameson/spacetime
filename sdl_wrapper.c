@@ -98,7 +98,7 @@ void sdl_clear(void)
     SDL_RenderClear(renderer);
 }
 
-void sdl_draw_polygon(Polygon *poly, Color c)
+void sdl_draw_polygon(const Polygon *poly, Color c)
 {
     for (size_t i = 0; i < poly->n; i++) {
         Vector2 v = poly->points[i];

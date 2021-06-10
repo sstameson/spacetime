@@ -16,6 +16,10 @@ Vector2 vec_sub(Vector2 v1, Vector2 v2);
 
 double vec_cross(Vector2 v1, Vector2 v2);
 
+double vec_dot(Vector2 v1, Vector2 v2);
+
+Vector2 vec_proj(Vector2 v, Vector2 u);
+
 Vector2 vec_rotate(double theta, Vector2 v);
 
 #endif

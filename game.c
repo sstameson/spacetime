@@ -7,9 +7,13 @@
 #include "vector.h"
 #include "color.h"
 #include "const.h"
+#include "collision.h"
 #include "polygon.h"
 #include "sdl_wrapper.h"
 
+const size_t BULLET_POINTS = 10;
+const double BULLET_RAD = 5.0;
+const double BULLET_VEL = 300.0;
 const double ASTEROID_RAD = 50.0;
 const double ASTEROID_VEL = 250.0;
 const uint8_t MIN_GREY = 50;
@@ -26,6 +30,7 @@ const Vector2 MIN = {
     .y = -HEIGHT / 2.0,
 };
 const Color BLACK = { .r = 0, .g = 0, .b = 0, .a = 255 };
+const Color RED = { .r = 255, .g = 0, .b = 0, .a = 255 };
 
 double rand_double(double min, double max)
 {
@@ -50,7 +55,16 @@ typedef struct {
     size_t length;
 } EntityIndexArray;
 
+typedef enum {
+    START,
+    PLAYING,
+    OVER,
+} GameStatus;
+
 typedef struct {
+    GameStatus status;
+    bool quiting;
+    bool restarting;
     bool thrusting;
     bool turning_clockwise;
     bool turning_counterclockwise;
@@ -71,6 +85,16 @@ void push(EntityIndexArray *arr, EntityIndex idx)
     assert(arr->length < MAX_ENTITIES);
     arr->idxs[arr->length] = idx;
     arr->length += 1;
+}
+
+void remove_index(EntityIndexArray *arr, size_t idx)
+{
+    assert(idx < arr->length);
+    assert(arr->length > 0);
+    for (size_t i = idx; i < arr->length-1; i++) {
+        arr->idxs[i] = arr->idxs[i+1];
+    }
+    arr->length -= 1;
 }
 
 void clear(EntityIndexArray *arr)
@@ -248,6 +272,9 @@ void init_game(GameState *state)
 
     // Initialize input state
     {
+        state->input.status = PLAYING;
+        state->input.quiting = false;
+        state->input.restarting = false;
         state->input.thrusting = false;
         state->input.turning_clockwise = false;
         state->input.turning_counterclockwise = false;
@@ -259,6 +286,11 @@ void init_game(GameState *state)
 
 void update(GameState *state, double dt)
 {
+    if (state->input.restarting) {
+        init_game(state);
+        return;
+    }
+
     // Update asteroids
     for (size_t i = 0; i < state->asteroids.length; i++) {
         Entity *entity = &state->entities[state->asteroids.idxs[i]];
@@ -266,41 +298,88 @@ void update(GameState *state, double dt)
         entity_tick(entity, dt);
     }
 
-    // Update player
-    {
-        Entity *player = &state->entities[state->player];
-        player->a = vec_mul(-DRAG, player->v);
-        teleport(player);
-        if (state->input.thrusting) {
-            Vector2 dir = vec(cos(player->theta), sin(player->theta));
-            player->a = vec_add(player->a, vec_mul(THRUST, dir));
+    if (state->input.status == PLAYING) {
+        // Update player
+        {
+            Entity *player = &state->entities[state->player];
+            player->a = vec_mul(-DRAG, player->v);
+            teleport(player);
+            if (state->input.thrusting) {
+                Vector2 dir = vec(cos(player->theta), sin(player->theta));
+                player->a = vec_add(player->a, vec_mul(THRUST, dir));
+            }
+            if (state->input.turning_clockwise && state->input.turning_counterclockwise) {
+                player->omega = 0.0;
+            } else if (state->input.turning_clockwise) {
+                player->omega = -PLAYER_OMEGA;
+            } else if (state->input.turning_counterclockwise) {
+                player->omega = PLAYER_OMEGA;
+            } else {
+                player->omega = 0.0;
+            }
+            entity_tick(player, dt);
         }
-        if (state->input.turning_clockwise && state->input.turning_counterclockwise) {
-            player->omega = 0.0;
-        } else if (state->input.turning_clockwise) {
-            player->omega = -PLAYER_OMEGA;
-        } else if (state->input.turning_counterclockwise) {
-            player->omega = PLAYER_OMEGA;
-        } else {
-            player->omega = 0.0;
+
+        // Spawn bullets
+        if (state->input.shooting) {
+            EntityIndex idx = alloc_entity(state->entities);
+            push(&state->bullets, idx);
+            Entity *bullet = &state->entities[idx];
+            double theta = 0.0;
+            double step = 2.0 * M_PI / BULLET_POINTS;
+            Vector2 v = vec(0.0, BULLET_RAD);
+            for (size_t i = 0; i < BULLET_POINTS; i++) {
+                bullet->poly.points[i] = vec_rotate(theta, v);
+                theta += step;
+            }
+            bullet->poly.n = BULLET_POINTS;
+            bullet->color = RED;
+            bullet->cent = poly_centroid(&bullet->poly);
+            bullet->v = vec(0.0, 0.0);
+            bullet->a = vec(0.0, 0.0);
+            bullet->theta = 0.0;
+            bullet->omega = 0.0;
         }
-        entity_tick(player, dt);
+
+        // Find player/asteroid collisions
+        {
+            Polygon *player_poly = &state->entities[state->player].poly;
+
+            for (size_t i = 0; i < state->asteroids.length; i++) {
+
+                EntityIndex idx = state->asteroids.idxs[i];
+                Polygon *asteroid_poly = &state->entities[idx].poly;
+
+                if (find_collision(player_poly, asteroid_poly)) {
+                    state->input.status = OVER;
+                    free_entity(state->entities, idx);
+                    remove_index(&state->asteroids, i);
+                    i--;
+                }
+            }
+        }
     }
 }
 
-void render(GameState *state)
+void render(const GameState *state)
 {
     sdl_clear();
 
     // Render asteroids
     for (size_t i = 0; i < state->asteroids.length; i++) {
-        Entity *entity = &state->entities[state->asteroids.idxs[i]];
-        sdl_draw_polygon(&entity->poly, entity->color);
+        const Entity *asteroid = &state->entities[state->asteroids.idxs[i]];
+        sdl_draw_polygon(&asteroid->poly, asteroid->color);
+    }
+
+    // Render bullets
+    for (size_t i = 0; i < state->bullets.length; i++) {
+        const Entity *bullet = &state->entities[state->bullets.idxs[i]];
+        sdl_draw_polygon(&bullet->poly, bullet->color);
     }
 
     // Render player
-    {
-        Entity *player = &state->entities[state->player];
+    if (state->input.status == PLAYING) {
+        const Entity *player = &state->entities[state->player];
         sdl_draw_polygon(&player->poly, player->color);
     }
 
@@ -309,46 +388,71 @@ void render(GameState *state)
 
 void on_key(char key, KeyEventType type, double held_time, InputState *input)
 {
-    switch(key) {
-        case UP_ARROW:
+    switch(input->status) {
+        case START:
         {
-            if (type == KEY_PRESSED) {
-                input->thrusting = true;
-            } else {
-                input->thrusting = false;
+            // TODO
+        } break;
+
+        case PLAYING:
+        {
+            switch(key) {
+                case UP_ARROW:
+                {
+                    if (type == KEY_PRESSED) {
+                        input->thrusting = true;
+                    } else {
+                        input->thrusting = false;
+                    }
+                } break;
+
+                case LEFT_ARROW:
+                {
+                    if (type == KEY_PRESSED) {
+                        input->turning_counterclockwise = true;
+                    } else {
+                        input->turning_counterclockwise = false;
+                    }
+                } break;
+
+                case RIGHT_ARROW:
+                {
+                    if (type == KEY_PRESSED) {
+                        input->turning_clockwise = true;
+                    } else {
+                        input->turning_clockwise = false;
+                    }
+                } break;
+
+                case ' ':
+                {
+                    if (type == KEY_PRESSED && held_time == 0.0) {
+                        input->shooting = true;
+                    } else {
+                        input->shooting = false;
+                    }
+                } break;
+
+                default:
+                {
+                } break;
             }
         } break;
 
-        case LEFT_ARROW:
+        case OVER:
         {
-            if (type == KEY_PRESSED) {
-                input->turning_counterclockwise = true;
-            } else {
-                input->turning_counterclockwise = false;
-            }
-        } break;
+            switch(key) {
+                case ENTER:
+                {
+                    if (type == KEY_PRESSED && held_time == 0.0) {
+                        input->restarting = true;
+                    }
+                } break;
 
-        case RIGHT_ARROW:
-        {
-            if (type == KEY_PRESSED) {
-                input->turning_clockwise = true;
-            } else {
-                input->turning_clockwise = false;
+                default:
+                {
+                } break;
             }
-        } break;
-
-        case ' ':
-        {
-            if (type == KEY_PRESSED && held_time == 0.0) {
-                input->shooting = true;
-            }
-            else {
-                input->shooting = false;
-            }
-        } break;
-
-        default:
-        {
         } break;
     }
 }
