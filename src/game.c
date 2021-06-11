@@ -447,25 +447,23 @@ void update(GameState *state, f64 dt)
         }
 
         // Find player/asteroid collisions
-        {
-            for (usize i = 0; i < state->asteroids.length; i++) {
+        for (usize i = 0; i < state->asteroids.length; i++) {
 
-                EntityIndex idx = state->asteroids.idxs[i];
-                Entity *asteroid = &state->entities[idx];
+            EntityIndex idx = state->asteroids.idxs[i];
+            Entity *asteroid = &state->entities[idx];
 
-                if (find_collision(&player->poly, &asteroid->poly)) {
-                    sdl_play_hit();
-                    sdl_play_game_over();
-                    state->num_asteroids -= 1;
-                    spawn_particles(
-                        state, NUM_PARTICLES, PLAYER_LENGTH, BLACK, player->cent);
-                    spawn_particles(
-                        state, NUM_PARTICLES, ASTEROID_RAD, asteroid->color, asteroid->cent);
-                    state->input.status = OVER;
-                    free_entity(state->free, idx);
-                    remove_index(&state->asteroids, i);
-                    i--;
-                }
+            if (find_collision(&player->poly, &asteroid->poly)) {
+                sdl_play_hit();
+                sdl_play_game_over();
+                state->num_asteroids -= 1;
+                spawn_particles(
+                    state, NUM_PARTICLES, PLAYER_LENGTH, BLACK, player->cent);
+                spawn_particles(
+                    state, NUM_PARTICLES, ASTEROID_RAD, asteroid->color, asteroid->cent);
+                state->input.status = OVER;
+                free_entity(state->free, idx);
+                remove_index(&state->asteroids, i);
+                i--;
             }
         }
     }
