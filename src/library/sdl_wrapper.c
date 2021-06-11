@@ -14,14 +14,14 @@ const Vector2 origin = {
     .x = WIDTH / 2.0,
     .y = HEIGHT / 2.0,
 };
+const f64 MS_PER_SEC = 1000.0;
 SDL_Window *window;
 SDL_Renderer *renderer;
 Mix_Chunk *shoot;
 Mix_Chunk *hit;
 Mix_Chunk *thrust;
-const f64 MS_PER_SEC = 1000.0;
-static int16_t x_points[MAX_POINTS];
-static int16_t y_points[MAX_POINTS];
+static i16 x_points[MAX_POINTS];
+static i16 y_points[MAX_POINTS];
 static u64 prev_tick = 0;
 static KeyHandler key_handler;
 static u32 key_start_timestamp;
@@ -132,8 +132,8 @@ void sdl_draw_polygon(const Polygon *poly, Color c)
         Vector2 v = poly->points[i];
         v = vec_add(v, origin);
         v.y = -v.y + HEIGHT;
-        x_points[i] = (int16_t) v.x;
-        y_points[i] = (int16_t) v.y;
+        x_points[i] = (i16) v.x;
+        y_points[i] = (i16) v.y;
     }
 
     filledPolygonRGBA(renderer, x_points, y_points, poly->n,
@@ -147,6 +147,9 @@ void sdl_show(void)
 
 void sdl_quit(void)
 {
+    Mix_FreeChunk(shoot);
+    Mix_FreeChunk(hit);
+    Mix_FreeChunk(thrust);
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
     SDL_Quit();
