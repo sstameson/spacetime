@@ -138,7 +138,8 @@ void sdl_draw_polygon(const Polygon *poly, Color c)
         y_points[i] = (int16_t) v.y;
     }
 
-    filledPolygonRGBA(renderer, x_points, y_points, poly->n, c.r, c.g, c.b, c.a);
+    filledPolygonRGBA(renderer, x_points, y_points, poly->n,
+            255 * c.r, 255 * c.g, 255 * c.b, 255 * c.a);
 }
 
 void sdl_show(void)
