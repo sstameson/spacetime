@@ -10,18 +10,23 @@ const usize PARTICLE_POINTS = 10;
 const usize NUM_PARTICLES = 10;
 const f64 PARTICLE_RAD = 1.0;
 const f64 PARTICLE_VEL = 50.0;
+
 const f64 PLAYER_LENGTH = 80.0;
 const f64 PLAYER_WIDTH = 40.0;
 const f64 PLAYER_PROP = 0.75;
-const usize BULLET_POINTS = 10;
-const f64 BULLET_RAD = 5.0;
-const f64 BULLET_VEL = 600.0;
-const f64 BIG_ASTEROID_RAD = 60.0;
-const f64 ASTEROID_RAD = 30.0;
-const f64 ASTEROID_VEL = 150.0;
 const f64 THRUST = 750.0;
 const f64 DRAG = 1.0;
 const f64 PLAYER_OMEGA = 1.25 * M_PI;
+
+const usize BULLET_POINTS = 10;
+const f64 BULLET_RAD = 5.0;
+const f64 BULLET_VEL = 600.0;
+
+const f64 BIG_ASTEROID_RAD = 60.0;
+const f64 ASTEROID_RAD = 30.0;
+const f64 ASTEROID_VEL = 150.0;
+const usize MAX_NUM_ASTEROIDS = 20;
+
 const Vector2 MAX = {
     .x = WIDTH / 2.0,
     .y = HEIGHT / 2.0,
@@ -90,6 +95,7 @@ typedef struct {
     EntityIndexArray bullets;
     EntityIndexArray particles;
     InputState input;
+    usize num_asteroids;
 } GameState;
 
 void push(EntityIndexArray *arr, EntityIndex idx)
@@ -160,6 +166,9 @@ void spawn_asteroid_with_info(
     u8 health)
 {
     EntityIndex idx = alloc_entity(state->free);
+    push(&state->asteroids, idx);
+    state->num_asteroids += 1;
+    printf("%lu\n", state->num_asteroids);
     Entity *entity = &state->entities[idx];
     {
         f64 theta = 0.0;
@@ -187,7 +196,6 @@ void spawn_asteroid_with_info(
     entity->theta = 0.0;
     entity->omega = 0.0;
     entity->health = health;
-    push(&state->asteroids, idx);
 }
 
 void spawn_asteroid(GameState *state)
@@ -292,6 +300,7 @@ void init_game(GameState *state)
     clear(&state->asteroids);
     clear(&state->bullets);
     clear(&state->particles);
+    state->num_asteroids = 0;
 
     // Spawn player
     {
@@ -436,6 +445,7 @@ void update(GameState *state, f64 dt)
                 if (find_collision(&player->poly, &asteroid->poly)) {
                     sdl_stop_thrust();
                     sdl_play_hit();
+                    state->num_asteroids -= 1;
                     spawn_particles(
                         state, NUM_PARTICLES, PLAYER_LENGTH, BLACK, player->cent);
                     spawn_particles(
@@ -461,10 +471,13 @@ void update(GameState *state, f64 dt)
             if (find_collision(asteroid_poly, bullet_poly)) {
                 sdl_play_hit();
                 asteroid->health -= 1;
+                state->num_asteroids -= 1;
                 if (asteroid->health == 0) {
                     spawn_particles(
                         state, NUM_PARTICLES, ASTEROID_RAD, asteroid->color, asteroid->cent);
-                    spawn_asteroid(state);
+                    if (state->num_asteroids < MAX_NUM_ASTEROIDS) {
+                        spawn_asteroid(state);
+                    }
                 } else {
                     spawn_asteroid_with_info(
                         state,
