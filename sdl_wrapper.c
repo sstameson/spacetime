@@ -2,6 +2,7 @@
 #include <stdint.h>
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_timer.h>
+#include <SDL2/SDL_mixer.h>
 #include <SDL2/SDL2_gfxPrimitives.h>
 
 #include "const.h"
@@ -17,6 +18,9 @@ const Vector2 origin = {
 };
 SDL_Window *window;
 SDL_Renderer *renderer;
+Mix_Chunk *shoot;
+Mix_Chunk *hit;
+Mix_Chunk *thrust;
 const double MS_PER_SEC = 1000.0;
 static int16_t x_points[MAX_POINTS];
 static int16_t y_points[MAX_POINTS];
@@ -39,6 +43,32 @@ void sdl_init(void)
         HEIGHT,
         0);
     renderer = SDL_CreateRenderer(window, -1, 0);
+    Mix_Init(MIX_INIT_OGG);
+    Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, 2, 1024);
+    Mix_ReserveChannels(1);
+    shoot = Mix_LoadWAV("sounds/shoot.wav");
+    hit = Mix_LoadWAV("sounds/hit.wav");
+    thrust = Mix_LoadWAV("sounds/thrust.wav");
+}
+
+void sdl_play_shoot(void)
+{
+    Mix_PlayChannel(-1, shoot, 0);
+}
+
+void sdl_play_hit(void)
+{
+    Mix_PlayChannel(-1, hit, 0);
+}
+
+void sdl_play_thrust(void)
+{
+    Mix_PlayChannel(0, thrust, -1);
+}
+
+void sdl_stop_thrust(void)
+{
+    Mix_FadeOutChannel(0, 500);
 }
 
 void sdl_on_key(KeyHandler handler)

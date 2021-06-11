@@ -362,6 +362,7 @@ void update(GameState *state, double dt)
 
         // Spawn bullets
         if (state->input.shooting) {
+            sdl_play_shoot();
             EntityIndex idx = alloc_entity(state->free);
             push(&state->bullets, idx);
             Entity *bullet = &state->entities[idx];
@@ -394,6 +395,8 @@ void update(GameState *state, double dt)
                 Polygon *asteroid_poly = &state->entities[idx].poly;
 
                 if (find_collision(player_poly, asteroid_poly)) {
+                    sdl_stop_thrust();
+                    sdl_play_hit();
                     state->input.status = OVER;
                     free_entity(state->free, idx);
                     remove_index(&state->asteroids, i);
@@ -413,6 +416,7 @@ void update(GameState *state, double dt)
             Polygon *bullet_poly = &state->entities[bullet_idx].poly;
 
             if (find_collision(asteroid_poly, bullet_poly)) {
+                sdl_play_hit();
                 asteroid->health -= 1;
                 if (asteroid->health == 0) {
                     spawn_asteroid(state);
@@ -482,10 +486,13 @@ void on_key(char key, KeyEventType type, double held_time, InputState *input)
             switch(key) {
                 case UP_ARROW:
                 {
-                    if (type == KEY_PRESSED) {
+                    if (type == KEY_PRESSED && held_time == 0.0) {
                         input->thrusting = true;
-                    } else {
+                        sdl_play_thrust();
+                    }
+                    if (type == KEY_RELEASED) {
                         input->thrusting = false;
+                        sdl_stop_thrust();
                     }
                 } break;
 
