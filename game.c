@@ -12,6 +12,7 @@
 #include "sdl_wrapper.h"
 
 const size_t PARTICLE_POINTS = 10;
+const size_t NUM_PARTICLES = 10;
 const double PARTICLE_RAD = 1.0;
 const double PARTICLE_VEL = 50.0;
 const double PLAYER_LENGTH = 80.0;
@@ -443,9 +444,9 @@ void update(GameState *state, double dt)
                     sdl_stop_thrust();
                     sdl_play_hit();
                     spawn_particles(
-                        state, 10, PLAYER_LENGTH, BLACK, player->cent);
+                        state, NUM_PARTICLES, PLAYER_LENGTH, BLACK, player->cent);
                     spawn_particles(
-                        state, 10, ASTEROID_RAD, asteroid->color, asteroid->cent);
+                        state, NUM_PARTICLES, ASTEROID_RAD, asteroid->color, asteroid->cent);
                     state->input.status = OVER;
                     free_entity(state->free, idx);
                     remove_index(&state->asteroids, i);
@@ -469,7 +470,7 @@ void update(GameState *state, double dt)
                 asteroid->health -= 1;
                 if (asteroid->health == 0) {
                     spawn_particles(
-                        state, 10, ASTEROID_RAD, asteroid->color, asteroid->cent);
+                        state, NUM_PARTICLES, ASTEROID_RAD, asteroid->color, asteroid->cent);
                     spawn_asteroid(state);
                 } else {
                     spawn_asteroid_with_info(
