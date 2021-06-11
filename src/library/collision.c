@@ -1,22 +1,18 @@
-#include <stdlib.h>
-#include <stdbool.h>
-#include <math.h>
-
-#include "collision.h"
+#include "base.h"
 #include "vector.h"
-#include "polygon.h"
+#include "collision.h"
 
 typedef struct {
-    double min;
-    double max;
+    f64 min;
+    f64 max;
 } Bounds;
 
 /* Compute the min and max x-values of projecting poly onto u */
 Bounds get_bounds(Polygon *poly, Vector2 u)
 {
-    double min = INFINITY;
-    double max = -INFINITY;
-    for (size_t i = 0; i < poly->n; i++) {
+    f64 min = INFINITY;
+    f64 max = -INFINITY;
+    for (usize i = 0; i < poly->n; i++) {
         Vector2 proj = vec_proj(poly->points[i], u);
         if (proj.x < min) {
             min = proj.x;
@@ -41,7 +37,7 @@ bool axes_overlap(Polygon *poly1, Polygon *poly2, Vector2 u)
 /* Iterate through projection vectors in poly */
 bool find_collision_shape(Polygon *poly, Polygon *poly1, Polygon *poly2)
 {
-    for (size_t i = 0; i < poly->n; i++) {
+    for (usize i = 0; i < poly->n; i++) {
         Vector2 u = vec_rotate(
                 M_PI / 2.0, vec_sub(poly->points[i], poly->points[(i+1) % poly->n]));
         if (!axes_overlap(poly1, poly2, u)) {

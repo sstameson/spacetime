@@ -1,7 +1,5 @@
 #ifndef _CONST_H_
 #define _CONST_H_
-#include "vector.h"
-#include "color.h"
 
 #define WIDTH 1024
 #define HEIGHT 768

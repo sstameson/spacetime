@@ -1,9 +1,4 @@
-#include <assert.h>
-#include <math.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include <stdbool.h>
-
+#include "base.h"
 #include "vector.h"
 #include "color.h"
 #include "const.h"
@@ -11,24 +6,22 @@
 #include "polygon.h"
 #include "sdl_wrapper.h"
 
-const size_t PARTICLE_POINTS = 10;
-const size_t NUM_PARTICLES = 10;
-const double PARTICLE_RAD = 1.0;
-const double PARTICLE_VEL = 50.0;
-const double PLAYER_LENGTH = 80.0;
-const double PLAYER_WIDTH = 40.0;
-const double PLAYER_PROP = 0.75;
-const size_t BULLET_POINTS = 10;
-const double BULLET_RAD = 5.0;
-const double BULLET_VEL = 600.0;
-const double BIG_ASTEROID_RAD = 60.0;
-const double ASTEROID_RAD = 30.0;
-const double ASTEROID_VEL = 150.0;
-const uint8_t MIN_GREY = 50;
-const uint8_t MAX_GREY = 200;
-const double THRUST = 750.0;
-const double DRAG = 1.0;
-const double PLAYER_OMEGA = 1.25 * M_PI;
+const usize PARTICLE_POINTS = 10;
+const usize NUM_PARTICLES = 10;
+const f64 PARTICLE_RAD = 1.0;
+const f64 PARTICLE_VEL = 50.0;
+const f64 PLAYER_LENGTH = 80.0;
+const f64 PLAYER_WIDTH = 40.0;
+const f64 PLAYER_PROP = 0.75;
+const usize BULLET_POINTS = 10;
+const f64 BULLET_RAD = 5.0;
+const f64 BULLET_VEL = 600.0;
+const f64 BIG_ASTEROID_RAD = 60.0;
+const f64 ASTEROID_RAD = 30.0;
+const f64 ASTEROID_VEL = 150.0;
+const f64 THRUST = 750.0;
+const f64 DRAG = 1.0;
+const f64 PLAYER_OMEGA = 1.25 * M_PI;
 const Vector2 MAX = {
     .x = WIDTH / 2.0,
     .y = HEIGHT / 2.0,
@@ -40,14 +33,14 @@ const Vector2 MIN = {
 const Color BLACK = { .r = 0.0, .g = 0.0, .b = 0.0, .a = 1.0 };
 const Color RED = { .r = 1.0, .g = 0.0, .b = 0.0, .a = 1.0 };
 
-double rand_double(double min, double max)
+f64 rand_f64(f64 min, f64 max)
 {
-    return (max - min) * (double) rand() / (double) RAND_MAX + min;
+    return (max - min) * (f64) rand() / (f64) RAND_MAX + min;
 }
 
 Vector2 rand_dir(void)
 {
-    double d = rand_double(-1.0, 1.0);
+    f64 d = rand_f64(-1.0, 1.0);
     Vector2 dir = {
         .x = d,
         .y = (rand() % 2 ? -1.0 : 1.0) * sqrt(1.0 - d * d),
@@ -61,16 +54,16 @@ typedef struct {
     Vector2 cent;
     Vector2 v;
     Vector2 a;
-    double theta;
-    double omega;
-    uint8_t health;
+    f64 theta;
+    f64 omega;
+    u8 health;
 } Entity;
 
-typedef size_t EntityIndex;
+typedef usize EntityIndex;
 
 typedef struct {
     EntityIndex idxs[MAX_ENTITIES];
-    size_t length;
+    usize length;
 } EntityIndexArray;
 
 typedef enum {
@@ -106,11 +99,11 @@ void push(EntityIndexArray *arr, EntityIndex idx)
     arr->length += 1;
 }
 
-void remove_index(EntityIndexArray *arr, size_t idx)
+void remove_index(EntityIndexArray *arr, usize idx)
 {
     assert(idx < arr->length);
     assert(arr->length > 0);
-    for (size_t i = idx; i < arr->length-1; i++) {
+    for (usize i = idx; i < arr->length-1; i++) {
         arr->idxs[i] = arr->idxs[i+1];
     }
     arr->length -= 1;
@@ -123,7 +116,7 @@ void clear(EntityIndexArray *arr)
 
 EntityIndex alloc_entity(bool free[MAX_ENTITIES])
 {
-    for (size_t i = 0; i < MAX_ENTITIES; i++) {
+    for (usize i = 0; i < MAX_ENTITIES; i++) {
         if (free[i]) {
             free[i] = false;
             return i;
@@ -145,13 +138,13 @@ void entity_translate(Entity *entity, Vector2 t)
     entity->cent = vec_add(entity->cent, t);
 }
 
-void entity_rotate(Entity *entity, double theta)
+void entity_rotate(Entity *entity, f64 theta)
 {
     poly_rotate(&entity->poly, theta, entity->cent);
     entity->theta += theta;
 }
 
-void entity_tick(Entity *entity, double dt)
+void entity_tick(Entity *entity, f64 dt)
 {
     entity->v = vec_add(entity->v, vec_mul(dt, entity->a));
     entity_translate(entity, vec_mul(dt, entity->v));
@@ -160,24 +153,24 @@ void entity_tick(Entity *entity, double dt)
 
 void spawn_asteroid_with_info(
     GameState *state,
-    double r,
+    f64 r,
     Color color,
     Vector2 cent,
     Vector2 v,
-    uint8_t health)
+    u8 health)
 {
     EntityIndex idx = alloc_entity(state->free);
     Entity *entity = &state->entities[idx];
     {
-        double theta = 0.0;
-        double steps[ASTEROID_POINTS];
-        double sum = 0.0;
-        for (size_t i = 0; i < ASTEROID_POINTS; i++) {
-            steps[i] = rand_double(0.0, 1.0);
+        f64 theta = 0.0;
+        f64 steps[ASTEROID_POINTS];
+        f64 sum = 0.0;
+        for (usize i = 0; i < ASTEROID_POINTS; i++) {
+            steps[i] = rand_f64(0.0, 1.0);
             sum += steps[i];
         }
         Vector2 v = vec(0.0, r);
-        for (size_t i = 0; i < ASTEROID_POINTS; i++) {
+        for (usize i = 0; i < ASTEROID_POINTS; i++) {
             entity->poly.points[i] = vec_rotate(theta, v);
             theta += 2.0 * M_PI * (steps[i] / sum);
         }
@@ -199,10 +192,10 @@ void spawn_asteroid_with_info(
 
 void spawn_asteroid(GameState *state)
 {
-    const double i = rand_double(0.25, 0.75);
+    const f64 i = rand_f64(0.25, 0.75);
     Color c = {.r = i, .g = i, .b = i, .a = 1.0 };
-    double r;
-    uint8_t health;
+    f64 r;
+    u8 health;
     if (rand() % 2) {
         r = BIG_ASTEROID_RAD;
         health = 2;
@@ -214,19 +207,19 @@ void spawn_asteroid(GameState *state)
     switch(rand() % 4) {
         case 0:
         {
-            cent = vec(MIN.x - r, rand_double(MIN.y, MAX.y));
+            cent = vec(MIN.x - r, rand_f64(MIN.y, MAX.y));
         } break;
         case 1:
         {
-            cent = vec(MAX.x + r, rand_double(MIN.y, MAX.y));
+            cent = vec(MAX.x + r, rand_f64(MIN.y, MAX.y));
         } break;
         case 2:
         {
-            cent = vec(rand_double(MIN.x, MAX.x), MIN.y - r);
+            cent = vec(rand_f64(MIN.x, MAX.x), MIN.y - r);
         } break;
         case 3:
         {
-            cent = vec(rand_double(MIN.x, MAX.x), MAX.y + r);
+            cent = vec(rand_f64(MIN.x, MAX.x), MAX.y + r);
         } break;
     }
     spawn_asteroid_with_info(
@@ -235,19 +228,19 @@ void spawn_asteroid(GameState *state)
 
 void spawn_particles(
     GameState *state,
-    size_t n,
-    double r,
+    usize n,
+    f64 r,
     Color color,
     Vector2 cent)
 {
-    for (size_t i = 0; i < n; i++) {
+    for (usize i = 0; i < n; i++) {
         EntityIndex idx = alloc_entity(state->free);
         push(&state->particles, idx);
         Entity *particle = &state->entities[idx];
-        double theta = 0.0;
-        double step = 2.0 * M_PI / PARTICLE_POINTS;
+        f64 theta = 0.0;
+        f64 step = 2.0 * M_PI / PARTICLE_POINTS;
         Vector2 v = vec(0.0, PARTICLE_RAD);
-        for (size_t i = 0; i < PARTICLE_POINTS; i++) {
+        for (usize i = 0; i < PARTICLE_POINTS; i++) {
             particle->poly.points[i] = vec_rotate(theta, v);
             theta += step;
         }
@@ -255,8 +248,8 @@ void spawn_particles(
         particle->color = color;
         particle->cent = poly_centroid(&particle->poly);
         entity_translate(particle,
-                vec_add(cent, vec_mul(rand_double(0.0, 1.0) * r, rand_dir())));
-        particle->v = vec_mul(rand_double(0.0, 1.0) * PARTICLE_VEL, rand_dir());
+                vec_add(cent, vec_mul(rand_f64(0.0, 1.0) * r, rand_dir())));
+        particle->v = vec_mul(rand_f64(0.0, 1.0) * PARTICLE_VEL, rand_dir());
         particle->a = vec(0.0, 0.0);
         particle->theta = 0.0;
         particle->omega = 0.0;
@@ -293,7 +286,7 @@ void teleport(Entity *entity)
 void init_game(GameState *state)
 {
     // Free all existing entities
-    for (size_t i = 0; i < MAX_ENTITIES; i++) {
+    for (usize i = 0; i < MAX_ENTITIES; i++) {
         free_entity(state->free, i);
     }
     clear(&state->asteroids);
@@ -320,7 +313,7 @@ void init_game(GameState *state)
     }
 
     // Spawn asteroids
-    for (size_t i = 0; i < 5; i++) {
+    for (usize i = 0; i < 5; i++) {
         spawn_asteroid(state);
     }
 
@@ -338,7 +331,7 @@ void init_game(GameState *state)
 }
 
 
-void update(GameState *state, double dt)
+void update(GameState *state, f64 dt)
 {
     if (state->input.restarting) {
         init_game(state);
@@ -346,7 +339,7 @@ void update(GameState *state, double dt)
     }
 
     // Update particles
-    for (size_t i = 0; i < state->particles.length; i++) {
+    for (usize i = 0; i < state->particles.length; i++) {
         EntityIndex idx = state->particles.idxs[i];
         Entity *particle = &state->entities[idx];
         particle->color.a -= dt;
@@ -360,14 +353,14 @@ void update(GameState *state, double dt)
     }
 
     // Update asteroids
-    for (size_t i = 0; i < state->asteroids.length; i++) {
+    for (usize i = 0; i < state->asteroids.length; i++) {
         Entity *entity = &state->entities[state->asteroids.idxs[i]];
         teleport(entity);
         entity_tick(entity, dt);
     }
 
     // Update bullets
-    for (size_t i = 0; i < state->bullets.length; i++) {
+    for (usize i = 0; i < state->bullets.length; i++) {
         EntityIndex idx = state->bullets.idxs[i];
         Entity *bullet = &state->entities[idx];
         entity_tick(bullet, dt);
@@ -414,10 +407,10 @@ void update(GameState *state, double dt)
             EntityIndex idx = alloc_entity(state->free);
             push(&state->bullets, idx);
             Entity *bullet = &state->entities[idx];
-            double theta = 0.0;
-            double step = 2.0 * M_PI / BULLET_POINTS;
+            f64 theta = 0.0;
+            f64 step = 2.0 * M_PI / BULLET_POINTS;
             Vector2 v = vec(0.0, BULLET_RAD);
-            for (size_t i = 0; i < BULLET_POINTS; i++) {
+            for (usize i = 0; i < BULLET_POINTS; i++) {
                 bullet->poly.points[i] = vec_rotate(theta, v);
                 theta += step;
             }
@@ -435,7 +428,7 @@ void update(GameState *state, double dt)
 
         // Find player/asteroid collisions
         {
-            for (size_t i = 0; i < state->asteroids.length; i++) {
+            for (usize i = 0; i < state->asteroids.length; i++) {
 
                 EntityIndex idx = state->asteroids.idxs[i];
                 Entity *asteroid = &state->entities[idx];
@@ -457,8 +450,8 @@ void update(GameState *state, double dt)
     }
 
     // Find bullet/asteroid collisions
-    for (size_t i = 0; i < state->asteroids.length; i++) {
-        for (size_t j = 0; j < state->bullets.length; j++) {
+    for (usize i = 0; i < state->asteroids.length; i++) {
+        for (usize j = 0; j < state->bullets.length; j++) {
             EntityIndex asteroid_idx = state->asteroids.idxs[i];
             EntityIndex bullet_idx = state->bullets.idxs[j];
             Entity *asteroid = &state->entities[asteroid_idx];
@@ -505,19 +498,19 @@ void render(const GameState *state)
     sdl_clear();
 
     // Render particles
-    for (size_t i = 0; i < state->particles.length; i++) {
+    for (usize i = 0; i < state->particles.length; i++) {
         const Entity *particle = &state->entities[state->particles.idxs[i]];
         sdl_draw_polygon(&particle->poly, particle->color);
     }
 
     // Render asteroids
-    for (size_t i = 0; i < state->asteroids.length; i++) {
+    for (usize i = 0; i < state->asteroids.length; i++) {
         const Entity *asteroid = &state->entities[state->asteroids.idxs[i]];
         sdl_draw_polygon(&asteroid->poly, asteroid->color);
     }
 
     // Render bullets
-    for (size_t i = 0; i < state->bullets.length; i++) {
+    for (usize i = 0; i < state->bullets.length; i++) {
         const Entity *bullet = &state->entities[state->bullets.idxs[i]];
         sdl_draw_polygon(&bullet->poly, bullet->color);
     }
@@ -531,7 +524,7 @@ void render(const GameState *state)
     sdl_show();
 }
 
-void on_key(char key, KeyEventType type, double held_time, InputState *input)
+void on_key(u8 key, KeyEventType type, f64 held_time, InputState *input)
 {
     switch(input->status) {
         case START:
@@ -609,17 +602,17 @@ int main(void)
     sdl_on_key((KeyHandler) on_key);
     static GameState state;
     init_game(&state);
-    double t = 0.0;
-    size_t frames = 0;
+    f64 t = 0.0;
+    usize frames = 0;
 
     while (sdl_running(&state.input)) {
-        double dt = time_since_last_tick();
+        f64 dt = time_since_last_tick();
         t += dt;
         frames++;
         update(&state, dt);
         render(&state);
     }
-    printf("%f fps\n", (double) frames / t);
+    printf("%f fps\n", (f64) frames / t);
 
     sdl_quit();
 }

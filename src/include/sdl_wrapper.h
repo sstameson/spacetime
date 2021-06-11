@@ -1,6 +1,8 @@
 #ifndef _SDL_WRAPPER_H_
 #define _SDL_WRAPPER_H_
 
+#include "base.h"
+
 typedef enum {
     LEFT_ARROW = 1,
     UP_ARROW = 2,
@@ -14,7 +16,7 @@ typedef enum {
     KEY_RELEASED
 } KeyEventType;
 
-typedef void (*KeyHandler)(char key, KeyEventType type, double held_time, void *aux);
+typedef void (*KeyHandler)(u8 key, KeyEventType type, f64 held_time, void *aux);
 
 void sdl_play_shoot(void);
 
@@ -38,6 +40,6 @@ void sdl_show(void);
 
 void sdl_quit(void);
 
-double time_since_last_tick(void);
+f64 time_since_last_tick(void);
 
 #endif

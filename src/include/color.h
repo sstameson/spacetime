@@ -1,13 +1,13 @@
 #ifndef _COLOR_H_
 #define _COLOR_H_
 
-#include <stdint.h>
+#include "base.h"
 
 typedef struct {
-    double r;
-    double g;
-    double b;
-    double a;
+    f64 r;
+    f64 g;
+    f64 b;
+    f64 a;
 } Color;
 
 #endif
