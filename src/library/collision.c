@@ -1,6 +1,5 @@
-#include "base.h"
-#include "vector.h"
 #include "collision.h"
+#include "vector.h"
 
 typedef struct {
     f64 min;
@@ -52,4 +51,3 @@ bool find_collision(Polygon *poly1, Polygon *poly2)
     return (find_collision_shape(poly1, poly1, poly2) &&
             find_collision_shape(poly2, poly1, poly2));
 }
-

@@ -3,7 +3,6 @@
 
 #include "base.h"
 #include "vector.h"
-#include "polygon.h"
 #include "const.h"
 
 typedef struct {
