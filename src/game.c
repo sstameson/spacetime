@@ -67,7 +67,7 @@ typedef struct {
     u8 health;
 } Entity;
 
-typedef usize EntityIndex;
+typedef i8 EntityIndex;
 
 typedef struct {
     EntityIndex idxs[MAX_ENTITIES];
@@ -131,11 +131,7 @@ EntityIndex alloc_entity(bool free[MAX_ENTITIES])
             return i;
         }
     }
-    // TODO: Return an invalid EntityIndex when running out of memory
-    // maybe use make EntityIndex an i8 and return -1
-    // this would require setting MAX_ENTITIES to be 100
-    fprintf(stderr, "Failed to allocate entity! Exiting...\n");
-    exit(1);
+    return -1;
 }
 
 void free_entity(bool free[MAX_ENTITIES], EntityIndex idx)
@@ -171,6 +167,9 @@ void spawn_asteroid_with_info(
     u8 health)
 {
     EntityIndex idx = alloc_entity(state->free);
+    if (idx < 0) {
+        return;
+    }
     push(&state->asteroids, idx);
     state->num_asteroids += 1;
     Entity *entity = &state->entities[idx];
@@ -247,6 +246,9 @@ void spawn_particles(
 {
     for (usize i = 0; i < n; i++) {
         EntityIndex idx = alloc_entity(state->free);
+        if (idx < 0) {
+            return;
+        }
         push(&state->particles, idx);
         Entity *particle = &state->entities[idx];
         f64 theta = 0.0;
@@ -310,6 +312,7 @@ void init_game(GameState *state)
 
     // Spawn player
     {
+        // This EntityIndex must be valid because everything was just freed
         state->player = alloc_entity(state->free);
         Entity *player = &state->entities[state->player];
         player->poly.points[0] = vec(PLAYER_PROP * PLAYER_LENGTH, 0.0);
@@ -420,25 +423,27 @@ void update(GameState *state, f64 dt)
         if (state->input.shooting) {
             sdl_play_shoot();
             EntityIndex idx = alloc_entity(state->free);
-            push(&state->bullets, idx);
-            Entity *bullet = &state->entities[idx];
-            f64 theta = 0.0;
-            f64 step = 2.0 * M_PI / BULLET_POINTS;
-            Vector2 v = vec(0.0, BULLET_RAD);
-            for (usize i = 0; i < BULLET_POINTS; i++) {
-                bullet->poly.points[i] = vec_rotate(theta, v);
-                theta += step;
+            if (idx >= 0) {
+                push(&state->bullets, idx);
+                Entity *bullet = &state->entities[idx];
+                f64 theta = 0.0;
+                f64 step = 2.0 * M_PI / BULLET_POINTS;
+                Vector2 v = vec(0.0, BULLET_RAD);
+                for (usize i = 0; i < BULLET_POINTS; i++) {
+                    bullet->poly.points[i] = vec_rotate(theta, v);
+                    theta += step;
+                }
+                bullet->poly.n = BULLET_POINTS;
+                bullet->color = RED;
+                bullet->cent = poly_centroid(&bullet->poly);
+                Vector2 dir = vec(cos(player->theta), sin(player->theta));
+                entity_translate(bullet, vec_add(player->cent, vec_mul(PLAYER_LENGTH / 2.0, dir)));
+                bullet->v = vec_mul(BULLET_VEL, dir);
+                bullet->a = vec(0.0, 0.0);
+                bullet->theta = 0.0;
+                bullet->omega = 0.0;
+                state->input.shooting = false;
             }
-            bullet->poly.n = BULLET_POINTS;
-            bullet->color = RED;
-            bullet->cent = poly_centroid(&bullet->poly);
-            Vector2 dir = vec(cos(player->theta), sin(player->theta));
-            entity_translate(bullet, vec_add(player->cent, vec_mul(PLAYER_LENGTH / 2.0, dir)));
-            bullet->v = vec_mul(BULLET_VEL, dir);
-            bullet->a = vec(0.0, 0.0);
-            bullet->theta = 0.0;
-            bullet->omega = 0.0;
-            state->input.shooting = false;
         }
 
         // Find player/asteroid collisions

@@ -7,6 +7,6 @@
 #define ASTEROID_POINTS 10
 
 #define MAX_POINTS 10
-#define MAX_ENTITIES 1000
+#define MAX_ENTITIES 100
 
 #endif
