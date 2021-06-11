@@ -10,6 +10,8 @@ const usize PARTICLE_POINTS = 10;
 const usize NUM_PARTICLES = 10;
 const f64 PARTICLE_RAD = 1.0;
 const f64 PARTICLE_VEL = 50.0;
+const f64 MIN_GREY = 0.25;
+const f64 MAX_GREY = 0.75;
 
 const f64 PLAYER_LENGTH = 80.0;
 const f64 PLAYER_WIDTH = 40.0;
@@ -25,6 +27,7 @@ const f64 BULLET_VEL = 600.0;
 const f64 BIG_ASTEROID_RAD = 60.0;
 const f64 ASTEROID_RAD = 30.0;
 const f64 ASTEROID_VEL = 150.0;
+const usize INIT_NUM_ASTEROIDS = 5;
 const usize MAX_NUM_ASTEROIDS = 20;
 
 const Vector2 MAX = {
@@ -129,6 +132,8 @@ EntityIndex alloc_entity(bool free[MAX_ENTITIES])
         }
     }
     // TODO: Return an invalid EntityIndex when running out of memory
+    // maybe use make EntityIndex an i8 and return -1
+    // this would require setting MAX_ENTITIES to be 100
     fprintf(stderr, "Failed to allocate entity! Exiting...\n");
     exit(1);
 }
@@ -199,7 +204,7 @@ void spawn_asteroid_with_info(
 
 void spawn_asteroid(GameState *state)
 {
-    const f64 i = rand_f64(0.25, 0.75);
+    const f64 i = rand_f64(MIN_GREY, MAX_GREY);
     Color c = {.r = i, .g = i, .b = i, .a = 1.0 };
     f64 r;
     u8 health;
@@ -292,6 +297,8 @@ void teleport(Entity *entity)
 
 void init_game(GameState *state)
 {
+    sdl_play_start();
+
     // Free all existing entities
     for (usize i = 0; i < MAX_ENTITIES; i++) {
         free_entity(state->free, i);
@@ -321,7 +328,7 @@ void init_game(GameState *state)
     }
 
     // Spawn asteroids
-    for (usize i = 0; i < 5; i++) {
+    for (usize i = 0; i < INIT_NUM_ASTEROIDS; i++) {
         spawn_asteroid(state);
     }
 
@@ -442,8 +449,8 @@ void update(GameState *state, f64 dt)
                 Entity *asteroid = &state->entities[idx];
 
                 if (find_collision(&player->poly, &asteroid->poly)) {
-                    sdl_stop_thrust();
                     sdl_play_hit();
+                    sdl_play_game_over();
                     state->num_asteroids -= 1;
                     spawn_particles(
                         state, NUM_PARTICLES, PLAYER_LENGTH, BLACK, player->cent);

@@ -17,9 +17,11 @@ const Vector2 origin = {
 const f64 MS_PER_SEC = 1000.0;
 SDL_Window *window;
 SDL_Renderer *renderer;
+Mix_Chunk *start;
 Mix_Chunk *shoot;
 Mix_Chunk *hit;
 Mix_Chunk *thrust;
+Mix_Chunk *game_over;
 static i16 x_points[MAX_POINTS];
 static i16 y_points[MAX_POINTS];
 static u64 prev_tick = 0;
@@ -44,9 +46,16 @@ void sdl_init(void)
     Mix_Init(MIX_INIT_OGG);
     Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, 2, 1024);
     Mix_ReserveChannels(1);
+    start = Mix_LoadWAV("sounds/start.wav");
     shoot = Mix_LoadWAV("sounds/shoot.wav");
     hit = Mix_LoadWAV("sounds/hit.wav");
     thrust = Mix_LoadWAV("sounds/thrust.wav");
+    game_over = Mix_LoadWAV("sounds/game_over.wav");
+}
+
+void sdl_play_start(void)
+{
+    Mix_PlayChannel(-1, start, 0);
 }
 
 void sdl_play_shoot(void)
@@ -57,6 +66,11 @@ void sdl_play_shoot(void)
 void sdl_play_hit(void)
 {
     Mix_PlayChannel(-1, hit, 0);
+}
+
+void sdl_play_game_over(void)
+{
+    Mix_PlayChannel(0, game_over, 0);
 }
 
 void sdl_play_thrust(void)
@@ -147,9 +161,11 @@ void sdl_show(void)
 
 void sdl_quit(void)
 {
+    Mix_FreeChunk(start);
     Mix_FreeChunk(shoot);
     Mix_FreeChunk(hit);
     Mix_FreeChunk(thrust);
+    Mix_FreeChunk(game_over);
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
     SDL_Quit();

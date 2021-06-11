@@ -18,9 +18,13 @@ typedef enum {
 
 typedef void (*KeyHandler)(u8 key, KeyEventType type, f64 held_time, void *aux);
 
+void sdl_play_start(void);
+
 void sdl_play_shoot(void);
 
 void sdl_play_hit(void);
+
+void sdl_play_game_over(void);
 
 void sdl_play_thrust(void);
 
