@@ -168,7 +168,6 @@ void spawn_asteroid_with_info(
     EntityIndex idx = alloc_entity(state->free);
     push(&state->asteroids, idx);
     state->num_asteroids += 1;
-    printf("%lu\n", state->num_asteroids);
     Entity *entity = &state->entities[idx];
     {
         f64 theta = 0.0;
