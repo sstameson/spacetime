@@ -70,11 +70,13 @@ void sdl_play_hit(void)
 
 void sdl_play_game_over(void)
 {
+    Mix_Volume(0, MIX_MAX_VOLUME);
     Mix_PlayChannel(0, game_over, 0);
 }
 
 void sdl_play_thrust(void)
 {
+    Mix_Volume(0, MIX_MAX_VOLUME);
     Mix_PlayChannel(0, thrust, -1);
 }
 
