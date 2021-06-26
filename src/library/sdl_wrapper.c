@@ -1,6 +1,7 @@
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_timer.h>
 #include <SDL2/SDL_mixer.h>
+#include <SDL2/SDL_ttf.h>
 #include <SDL2/SDL2_gfxPrimitives.h>
 
 #include "const.h"
@@ -22,6 +23,7 @@ Mix_Chunk *shoot;
 Mix_Chunk *hit;
 Mix_Chunk *thrust;
 Mix_Chunk *game_over;
+TTF_Font *score_font;
 static i16 x_points[MAX_POINTS];
 static i16 y_points[MAX_POINTS];
 static u64 prev_tick = 0;
@@ -51,7 +53,33 @@ void sdl_init(void)
     hit = Mix_LoadWAV("sounds/hit.wav");
     thrust = Mix_LoadWAV("sounds/thrust.wav");
     game_over = Mix_LoadWAV("sounds/game_over.wav");
+    TTF_Init();
+    score_font = TTF_OpenFont("fonts/RobotoMono-Regular.ttf", 75);
 }
+
+void sdl_render_score(usize score)
+{
+    i32 width;
+    SDL_GetWindowSize(window, &width, NULL);
+
+    SDL_Color black = { 0, 0, 0 };
+
+    char buffer[25];
+    sprintf(buffer, "%lu", score);
+
+    SDL_Surface *surface = TTF_RenderUTF8_Solid(score_font, buffer, black);
+    SDL_Texture *texture = SDL_CreateTextureFromSurface(renderer, surface);
+
+    i32 w, h;
+    SDL_QueryTexture(texture, NULL, NULL, &w, &h);
+    SDL_Rect r = (SDL_Rect) { (width - w) / 2, 0, w, h };
+
+    SDL_RenderCopy(renderer, texture, NULL, &r);
+
+    SDL_FreeSurface(surface);
+    SDL_DestroyTexture(texture);
+}
+
 
 void sdl_play_start(void)
 {

@@ -1,7 +1,7 @@
 CC="clang"
 
 CFLAGS="-Wall -Werror -fsanitize=address "
-CFLAGS+="-lSDL2 -lSDL2_gfx -lSDL2_mixer -Isrc/include"
+CFLAGS+="-lSDL2 -lSDL2_gfx -lSDL2_ttf -lSDL2_mixer -Isrc/include"
 
 BASE="src/library/"
 CFILES="${BASE}sdl_wrapper.c "

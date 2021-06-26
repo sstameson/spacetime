@@ -98,6 +98,7 @@ typedef struct {
     EntityIndexArray bullets;
     EntityIndexArray particles;
     InputState input;
+    usize score;
     usize num_asteroids;
 } GameState;
 
@@ -309,6 +310,7 @@ void init_game(GameState *state)
     clear(&state->bullets);
     clear(&state->particles);
     state->num_asteroids = 0;
+    state->score = 0;
 
     // Spawn player
     {
@@ -482,12 +484,14 @@ void update(GameState *state, f64 dt)
                 asteroid->health -= 1;
                 state->num_asteroids -= 1;
                 if (asteroid->health == 0) {
+                    state->score += 10;
                     spawn_particles(
                         state, NUM_PARTICLES, ASTEROID_RAD, asteroid->color, asteroid->cent);
                     if (state->num_asteroids < MAX_NUM_ASTEROIDS) {
                         spawn_asteroid(state);
                     }
                 } else {
+                    state->score += 5;
                     spawn_asteroid_with_info(
                         state,
                         ASTEROID_RAD,
@@ -518,6 +522,11 @@ void update(GameState *state, f64 dt)
 void render(const GameState *state)
 {
     sdl_clear();
+
+    // Render score
+    if (state->input.status == PLAYING || state->input.status == OVER) {
+        sdl_render_score(state->score);
+    }
 
     // Render particles
     for (usize i = 0; i < state->particles.length; i++) {
